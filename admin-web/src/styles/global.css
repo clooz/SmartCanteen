@@ -1,0 +1,165 @@
+/* ── Reset ── */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+/* ── 字体渲染优化 ── */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  box-sizing: border-box;
+}
+
+/* ── 表格：去掉竖向分割线，只保留横向细线 ── */
+.ant-table-cell {
+  border-right: none !important;
+}
+.ant-table-thead > tr > th {
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.01em;
+}
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+.ant-table-tbody > tr:last-child > td {
+  border-bottom: none !important;
+}
+
+/* ── 卡片阴影 ── */
+.ant-card {
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.05) !important;
+  transition: box-shadow 0.2s ease !important;
+}
+.ant-card:hover {
+  box-shadow: 0 4px 12px 0 rgba(0,0,0,0.1), 0 2px 6px -1px rgba(0,0,0,0.06) !important;
+}
+
+/* ── 按钮过渡动画 ── */
+.ant-btn {
+  transition: all 0.15s ease !important;
+  font-weight: 500 !important;
+}
+.ant-btn:active {
+  transform: scale(0.97);
+}
+
+/* ── 侧边栏菜单选中态更现代 ── */
+.ant-menu-item-selected {
+  font-weight: 600 !important;
+}
+
+/* ── 分页居中对齐 ── */
+.ant-pagination {
+  margin-top: 16px !important;
+}
+
+/* ── Input focus 效果 ── */
+.ant-input:focus,
+.ant-input-focused,
+.ant-select-focused .ant-select-selector {
+  border-color: #1890ff !important;
+}
+
+/* ── Modal 更现代 ── */
+.ant-modal-content {
+  padding: 0 !important;
+}
+.ant-modal-header {
+  padding: 20px 24px 16px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  margin-bottom: 0 !important;
+}
+.ant-modal-body {
+  padding: 20px 24px !important;
+}
+.ant-modal-footer {
+  padding: 16px 24px !important;
+  border-top: 1px solid #f3f4f6 !important;
+  margin-top: 0 !important;
+}
+
+/* ── Tag 样式 ── */
+.ant-tag {
+  font-weight: 500 !important;
+  border: none !important;
+}
+
+/* ── 菜品卡片网格布局 ── */
+.dish-card-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: start;
+}
+
+/* ≤1599px → 4列 */
+@media (max-width: 1599px) {
+  .dish-card-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ≤1199px → 3列 */
+@media (max-width: 1199px) {
+  .dish-card-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ≤767px → 2列 */
+@media (max-width: 767px) {
+  .dish-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ≤480px → 1列 */
+@media (max-width: 480px) {
+  .dish-card-grid {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+/* 卡片 item：撑满整个网格格子高度 */
+.dish-card-item {
+  display: flex;
+}
+
+/* 卡片本体：flex 列布局，高度与同行最高者一致 */
+.dish-card {
+  width: 100%;
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+
+/* 封面区域不压缩 */
+.dish-card .ant-card-cover {
+  flex-shrink: 0;
+}
+
+/* body 区域撑满剩余高度 */
+.dish-card .ant-card-body {
+  flex: 1 !important;
+  min-height: 0;
+}
+
+/* ── 滚动条美化 ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   Table, Button, Space, Tag, Image, Modal, Form, Input, InputNumber,
   Select, Upload, Switch, message, Typography, Popconfirm, App,
-  Card, Row, Col, Tooltip, Badge, Pagination, Empty,
+  Card, Tooltip, Pagination, Empty,
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
@@ -10,7 +10,7 @@ import {
 } from '@ant-design/icons'
 import { dishesApi } from '../../api/dishes'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 const { Option } = Select
 
 const CATEGORIES = ['主食', '荤菜', '素菜', '汤', '小吃', '饮料', '其他']
@@ -151,13 +151,15 @@ export default function DishesPage() {
 
   const columns = [
     {
-      title: '图片', dataIndex: 'image_url', width: 72,
+      title: '图片', dataIndex: 'image_url',
+      width: 80, align: 'center' as const,
       render: (url: string) => url
-        ? <Image src={url} width={48} height={48} style={{ borderRadius: 6, objectFit: 'cover' }} />
-        : <div style={{ width: 48, height: 48, background: '#f0f0f0', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bfbfbf', fontSize: 20 }}>🍽</div>,
+        ? <Image src={url} width={48} height={48} style={{ borderRadius: 6, objectFit: 'cover', display: 'block', margin: '0 auto' }} />
+        : <div style={{ width: 48, height: 48, background: '#f0f0f0', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bfbfbf', fontSize: 20, margin: '0 auto' }}>🍽</div>,
     },
     {
       title: '菜品名称', dataIndex: 'name',
+      width: 220,
       filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
         <div style={{ padding: 8 }}>
           <Input placeholder="搜索菜品名称" value={selectedKeys[0]}
@@ -173,23 +175,30 @@ export default function DishesPage() {
       render: (v: string, r: any) => (
         <div>
           <Text strong>{v}</Text>
-          {r.description && <Paragraph type="secondary" ellipsis style={{ margin: 0, fontSize: 12 }}>{r.description}</Paragraph>}
+          {r.description && (
+            <Text type="secondary" style={{ margin: 0, fontSize: 12, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {r.description}
+            </Text>
+          )}
         </div>
       ),
     },
     {
-      title: '分类', dataIndex: 'category', width: 100,
+      title: '分类', dataIndex: 'category',
+      width: 110, align: 'center' as const,
       filters: CATEGORIES.map(c => ({ text: c, value: c })),
       onFilter: (value: any, record: any) => record.category === value,
-      render: (v: string) => <Tag>{v}</Tag>,
+      render: (v: string) => <Tag style={{ margin: 0 }}>{v}</Tag>,
     },
     {
-      title: '价格', dataIndex: 'price', width: 100,
+      title: '价格', dataIndex: 'price',
+      width: 110, align: 'right' as const,
       sorter: (a: any, b: any) => Number(a.price) - Number(b.price),
       render: (v: number) => <Text strong>¥{Number(v).toFixed(2)}</Text>,
     },
     {
-      title: '状态', dataIndex: 'is_available', width: 100,
+      title: '状态', dataIndex: 'is_available',
+      width: 110, align: 'center' as const,
       filters: [{ text: '上架', value: 1 }, { text: '下架', value: 0 }],
       onFilter: (value: any, record: any) => record.is_available === value,
       render: (v: number, record: any) => (
@@ -203,9 +212,9 @@ export default function DishesPage() {
       ),
     },
     {
-      title: '操作', width: 120,
+      title: '操作', width: 150, align: 'center' as const,
       render: (_: any, record: any) => (
-        <Space>
+        <Space size={4}>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</Button>
           <Popconfirm title="确定删除此菜品？" okType="danger" okText="删除" cancelText="取消"
             onConfirm={() => handleDelete(record.id)}>
@@ -221,71 +230,99 @@ export default function DishesPage() {
   // 卡片视图
   const renderCardView = () => (
     <>
-      <Row gutter={[16, 16]}>
+      <div className="dish-card-grid">
         {loading
-          ? Array.from({ length: pageSize }).map((_, i) => (
-              <Col key={i} xs={24} sm={12} md={8} lg={6} xl={6}>
-                <Card loading style={{ borderRadius: 8 }} />
-              </Col>
+          ? Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="dish-card-item">
+                <Card loading className="dish-card" />
+              </div>
             ))
           : data.length === 0
-            ? <Col span={24}><Empty description="暂无菜品" /></Col>
+            ? (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Empty description="暂无菜品" style={{ padding: '48px 0' }} />
+              </div>
+            )
             : data.map(item => (
-                <Col key={item.id} xs={24} sm={12} md={8} lg={6} xl={6}>
-                  <Card
-                    hoverable
-                    style={{ borderRadius: 8, overflow: 'hidden' }}
-                    cover={
-                      item.image_url
+              <div key={item.id} className="dish-card-item">
+                <Card
+                  hoverable
+                  className="dish-card"
+                  styles={{ body: { flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column' } }}
+                  cover={
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      {item.image_url
                         ? <img src={item.image_url} alt={item.name}
-                            style={{ height: 160, objectFit: 'cover', display: 'block' }} />
+                            style={{ height: 140, width: '100%', objectFit: 'cover', display: 'block' }} />
                         : <div style={{
-                            height: 160, background: '#f5f5f5',
-                            display: 'flex', alignItems: 'center',
-                            justifyContent: 'center', fontSize: 48, color: '#d9d9d9',
-                          }}>🍽</div>
-                    }
-                    actions={[
-                      <Tooltip title="编辑" key="edit">
-                        <EditOutlined onClick={() => openEdit(item)} />
-                      </Tooltip>,
-                      <Tooltip title={item.is_available ? '点击下架' : '点击上架'} key="toggle">
-                        <span onClick={() => handleToggleAvailable(item)}>
-                          {item.is_available
-                            ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                            : <StopOutlined style={{ color: '#d9d9d9' }} />}
-                        </span>
-                      </Tooltip>,
-                      <Popconfirm key="delete" title="确定删除？" okType="danger" okText="删除" cancelText="取消"
+                            height: 140, background: 'linear-gradient(135deg, #f0f5ff 0%, #e6f4ff 100%)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 44, color: '#adc6ff',
+                          }}>🍽️</div>
+                      }
+                      {/* 上架/下架 悬浮在图片右上角 */}
+                      <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                        <Switch
+                          size="small"
+                          checked={!!item.is_available}
+                          checkedChildren="上架"
+                          unCheckedChildren="下架"
+                          onChange={() => handleToggleAvailable(item)}
+                          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+                        />
+                      </div>
+                    </div>
+                  }
+                >
+                  {/* 名称 + 分类标签 */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <Text strong style={{ fontSize: 14, lineHeight: '22px', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={item.name}>
+                      {item.name}
+                    </Text>
+                    <Tag color="blue" style={{ margin: 0, flexShrink: 0, fontSize: 11, lineHeight: '20px', padding: '0 6px' }}>
+                      {item.category}
+                    </Tag>
+                  </div>
+
+                  {/* 描述 — 固定 1 行高度，无内容时占位 */}
+                  <div style={{ height: 18, overflow: 'hidden', marginBottom: 0 }}>
+                    <Text type="secondary" style={{ fontSize: 12, lineHeight: '18px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.description || '\u00A0'}
+                    </Text>
+                  </div>
+
+                  {/* 弹性空白，推动底部对齐 */}
+                  <div style={{ flex: 1 }} />
+
+                  {/* 底部：价格 + 操作按钮 */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, marginTop: 8, borderTop: '1px solid #f0f0f0' }}>
+                    <Text strong style={{ fontSize: 16, color: '#1890ff', letterSpacing: '-0.3px' }}>
+                      ¥{Number(item.price).toFixed(2)}
+                    </Text>
+                    <Space size={0}>
+                      <Tooltip title="编辑">
+                        <Button
+                          size="small" type="text"
+                          icon={<EditOutlined />}
+                          onClick={() => openEdit(item)}
+                          style={{ color: '#8c8c8c' }}
+                        />
+                      </Tooltip>
+                      <Popconfirm title="确定删除此菜品？" okType="danger" okText="删除" cancelText="取消"
                         onConfirm={() => handleDelete(item.id)}>
                         <Tooltip title="删除">
-                          <DeleteOutlined style={{ color: '#ff4d4f' }} />
+                          <Button size="small" type="text" danger icon={<DeleteOutlined />} />
                         </Tooltip>
-                      </Popconfirm>,
-                    ]}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                      <Text strong style={{ fontSize: 15, flex: 1, marginRight: 8 }} ellipsis>{item.name}</Text>
-                      <Badge
-                        status={item.is_available ? 'success' : 'default'}
-                        text={<Text style={{ fontSize: 12 }}>{item.is_available ? '上架' : '下架'}</Text>}
-                      />
-                    </div>
-                    {item.description && (
-                      <Paragraph type="secondary" ellipsis={{ rows: 2 }}
-                        style={{ fontSize: 12, marginBottom: 8 }}>
-                        {item.description}
-                      </Paragraph>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Tag style={{ margin: 0 }}>{item.category}</Tag>
-                      <Text strong style={{ fontSize: 16 }}>¥{Number(item.price).toFixed(2)}</Text>
-                    </div>
-                  </Card>
-                </Col>
-              ))
+                      </Popconfirm>
+                    </Space>
+                  </div>
+                </Card>
+              </div>
+            ))
         }
-      </Row>
+      </div>
+
       {!loading && data.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
           <Pagination
@@ -349,9 +386,11 @@ export default function DishesPage() {
         {viewMode === 'list' ? (
           <Table
             rowKey="id"
+            size="middle"
             dataSource={data}
             columns={columns}
             loading={loading}
+            scroll={{ x: 800 }}
             rowSelection={{
               selectedRowKeys,
               onChange: keys => setSelectedRowKeys(keys as number[]),

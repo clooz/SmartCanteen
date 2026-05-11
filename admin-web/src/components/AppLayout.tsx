@@ -4,7 +4,8 @@ import {
   ShopOutlined, CalendarOutlined, UnorderedListOutlined,
   BarChartOutlined, TeamOutlined, BankOutlined, WalletOutlined,
   StarOutlined, LogoutOutlined, UserOutlined, CoffeeOutlined,
-  SunOutlined, MoonOutlined,
+  SunOutlined, MoonOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  DownOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { authStore } from '../store/authStore'
@@ -46,6 +47,10 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
   const isAdmin = user?.role === 'admin'
   const menuItems = isAdmin ? adminMenuItems : chefMenuItems
 
+  const currentPage = [...adminMenuItems, ...chefMenuItems].find(
+    item => item.key === location.pathname
+  )
+
   const handleLogout = () => {
     authStore.clear()
     navigate('/login')
@@ -60,105 +65,168 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
     },
   }
 
+  const isDark = themeMode === 'dark'
+
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+      {/* 侧边栏 */}
       <Sider
         collapsed={collapsed}
         trigger={null}
+        width={220}
+        collapsedWidth={64}
         style={{
-          background: token.colorBgContainer,
+          background: isDark ? '#141414' : '#fff',
           borderRight: `1px solid ${token.colorBorderSecondary}`,
-          position: 'relative',
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          overflow: 'hidden',
+          flexShrink: 0,
         }}
       >
+        {/* Logo */}
         <div style={{
-          height: 64,
+          height: 56,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
+          padding: collapsed ? '0' : '0 20px',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          gap: 10,
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          padding: '0 16px',
+          flexShrink: 0,
         }}>
-          <CoffeeOutlined style={{ fontSize: 20, color: token.colorPrimary }} />
+          <div style={{
+            width: 30, height: 30,
+            borderRadius: 8,
+            background: token.colorPrimary,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <CoffeeOutlined style={{ color: '#fff', fontSize: 15 }} />
+          </div>
           {!collapsed && (
-            <Text strong style={{ fontSize: 15, whiteSpace: 'nowrap' }}>
+            <Text strong style={{ fontSize: 15, whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
               智能食堂
             </Text>
           )}
         </div>
 
-        <Menu
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={({ key }) => navigate(key)}
-          style={{ border: 'none', marginTop: 4, paddingBottom: 48 }}
-        />
+        {/* 菜单 */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingTop: 8, paddingBottom: 56 }}>
+          <Menu
+            mode="inline"
+            selectedKeys={[location.pathname]}
+            items={menuItems}
+            onClick={({ key }) => navigate(key)}
+            style={{ border: 'none' }}
+          />
+        </div>
 
-        {/* 自定义折叠按钮 */}
+        {/* 折叠按钮 */}
         <div
           onClick={() => setCollapsed(!collapsed)}
           style={{
             position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
+            bottom: 0, left: 0, right: 0,
             height: 48,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             borderTop: `1px solid ${token.colorBorderSecondary}`,
-            color: token.colorTextSecondary,
-            fontSize: 12,
+            color: token.colorTextTertiary,
+            fontSize: 13,
             gap: 6,
-            transition: 'color 0.2s',
+            userSelect: 'none',
+            transition: 'color 0.2s, background 0.2s',
           }}
-          onMouseEnter={e => (e.currentTarget.style.color = token.colorPrimary)}
-          onMouseLeave={e => (e.currentTarget.style.color = token.colorTextSecondary)}
+          onMouseEnter={e => {
+            e.currentTarget.style.color = token.colorPrimary
+            e.currentTarget.style.background = token.colorPrimaryBg
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color = token.colorTextTertiary
+            e.currentTarget.style.background = 'transparent'
+          }}
         >
           {collapsed
-            ? <><span style={{ fontSize: 14 }}>›</span></>
-            : <><span style={{ fontSize: 14 }}>‹</span><span>收起</span></>
+            ? <MenuUnfoldOutlined style={{ fontSize: 14 }} />
+            : <><MenuFoldOutlined style={{ fontSize: 14 }} /><span>收起</span></>
           }
         </div>
       </Sider>
 
-      <Layout>
+      <Layout style={{
+        background: token.colorBgLayout,
+        overflow: 'auto',
+        flex: 1,
+      }}>
+        {/* 顶部栏 */}
         <Header style={{
           background: token.colorBgContainer,
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
           padding: '0 24px',
+          height: 56,
+          lineHeight: '56px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 12,
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
         }}>
-          <Tooltip title={themeMode === 'light' ? '切换深色模式' : '切换浅色模式'}>
-            <Button
-              type="text"
-              icon={themeMode === 'light' ? <MoonOutlined /> : <SunOutlined />}
-              onClick={onToggleTheme}
-            />
-          </Tooltip>
+          {/* 页面标题 */}
+          <Text strong style={{ fontSize: 15, color: token.colorTextHeading }}>
+            {currentPage?.label || '控制台'}
+          </Text>
 
-          <Dropdown menu={userDropdown} placement="bottomRight">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <Avatar
-                size="small"
-                icon={<UserOutlined />}
-                src={user?.avatar || undefined}
+          {/* 右侧操作区 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Tooltip title={themeMode === 'light' ? '深色模式' : '浅色模式'}>
+              <Button
+                type="text"
+                icon={themeMode === 'light' ? <MoonOutlined /> : <SunOutlined />}
+                onClick={onToggleTheme}
+                style={{ color: token.colorTextSecondary }}
               />
-              <Text>{user?.nickname || user?.username}</Text>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                ({user?.role === 'admin' ? '管理员' : '厨师'})
-              </Text>
-            </div>
-          </Dropdown>
+            </Tooltip>
+
+            <Dropdown menu={userDropdown} placement="bottomRight">
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: 'pointer',
+                padding: '6px 12px 6px 8px',
+                borderRadius: 8,
+                transition: 'background 0.15s',
+              }}
+                onMouseEnter={e => (e.currentTarget.style.background = token.colorFillTertiary)}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <Avatar
+                  size={28}
+                  icon={<UserOutlined />}
+                  src={user?.avatar || undefined}
+                  style={{ background: token.colorPrimary, flexShrink: 0 }}
+                />
+                <div style={{ lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: token.colorText, whiteSpace: 'nowrap' }}>
+                    {user?.nickname || user?.username}
+                  </div>
+                  <div style={{ fontSize: 11, color: token.colorTextTertiary, whiteSpace: 'nowrap' }}>
+                    {user?.role === 'admin' ? '管理员' : '厨师'}
+                  </div>
+                </div>
+                <DownOutlined style={{ fontSize: 10, color: token.colorTextTertiary }} />
+              </div>
+            </Dropdown>
+          </div>
         </Header>
 
-        <Content style={{ margin: 24 }}>
+        {/* 内容区 */}
+        <Content style={{ padding: 24 }}>
           <Outlet />
         </Content>
       </Layout>
