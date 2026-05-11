@@ -1,0 +1,33 @@
+---
+description: Project Development Guidelines
+globs: ["**/*"]
+alwaysApply: true
+---
+# 点菜系统 Development Guidelines
+
+Auto-generated from Specify init. Last updated: 2026-05-11
+
+## Active Technologies
+
+[待 /speckit.plan 执行后自动填充]
+
+## Project Structure
+
+```text
+[待 /speckit.plan 执行后由实现计划确定]
+```
+
+## Commands
+
+[待技术栈确定后填充]
+
+## Code Style
+
+[待语言确定后填充]
+
+## Recent Changes
+
+- Initial commit: Specify framework initialized
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->
