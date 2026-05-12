@@ -53,18 +53,39 @@ const getMyRecharges = async (req, res) => {
 
 // 管理员获取所有充值申请（支持按状态筛选）
 const getAllRecharges = async (req, res) => {
-  const { status, page = 1, page_size = 20 } = req.query;
+  const { status, page = 1, page_size = 20, keyword, user_name, company_name, remark } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(page_size);
 
   let where = ['1=1'];
   let params = [];
   if (status) { where.push('r.status = ?'); params.push(status); }
+  if (keyword) {
+    const kw = `%${String(keyword).trim()}%`;
+    where.push('(u.nickname LIKE ? OR u.username LIKE ? OR c.name LIKE ? OR r.remark LIKE ?)');
+    params.push(kw, kw, kw, kw);
+  }
+  if (user_name) {
+    const kw = `%${String(user_name).trim()}%`;
+    where.push('(u.nickname LIKE ? OR u.username LIKE ?)');
+    params.push(kw, kw);
+  }
+  if (company_name) {
+    where.push('c.name LIKE ?');
+    params.push(`%${String(company_name).trim()}%`);
+  }
+  if (remark) {
+    where.push('r.remark LIKE ?');
+    params.push(`%${String(remark).trim()}%`);
+  }
 
   const whereSql = where.join(' AND ');
 
   try {
     const [[{ total }]] = await pool.query(
-      `SELECT COUNT(*) AS total FROM recharge_records r WHERE ${whereSql}`,
+      `SELECT COUNT(*) AS total FROM recharge_records r
+       JOIN users u ON r.user_id = u.id
+       LEFT JOIN companies c ON u.company_id = c.id
+       WHERE ${whereSql}`,
       params
     );
     const [rows] = await pool.query(

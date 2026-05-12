@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const {
   getActivities, createActivity, closeActivity,
-  getWishItems, createWishItem, voteWishItem, unvoteWishItem, adoptWishItem
+  getWishItems, createWishItem, voteWishItem, unvoteWishItem, adoptWishItem,
+  getComments, createComment, deleteComment
 } = require('../controllers/wishController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
@@ -23,5 +24,10 @@ router.delete('/items/:item_id/vote', authenticate, unvoteWishItem);
 
 // 管理员/厨师采纳愿望
 router.post('/items/:item_id/adopt', authenticate, authorize('admin', 'chef'), adoptWishItem);
+
+// 评论（所有登录用户可查看和发评论，只能删自己的；管理员/厨师也可删）
+router.get('/items/:item_id/comments', authenticate, getComments);
+router.post('/items/:item_id/comments', authenticate, createComment);
+router.delete('/items/:item_id/comments/:comment_id', authenticate, deleteComment);
 
 module.exports = router;

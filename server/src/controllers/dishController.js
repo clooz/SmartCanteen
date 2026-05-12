@@ -1,9 +1,17 @@
 const { pool } = require('../db/connection');
 const { success, fail } = require('../utils/response');
+const fs = require('fs');
+const path = require('path');
+
+const deleteUploadedFile = (imageUrl) => {
+  if (!imageUrl) return;
+  const filePath = path.join(__dirname, '../../', imageUrl);
+  fs.unlink(filePath, () => {});
+};
 
 // 获取菜品列表（支持分类筛选、关键字搜索、分页）
 const getDishes = async (req, res) => {
-  const { category, keyword, is_available, page = 1, page_size = 20 } = req.query;
+  const { category, keyword, is_available, page = 1, page_size = 20, price_min, price_max } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(page_size);
 
   let where = ['1=1'];
@@ -17,9 +25,17 @@ const getDishes = async (req, res) => {
     where.push('name LIKE ?');
     params.push(`%${keyword}%`);
   }
-  if (is_available !== undefined) {
+  if (is_available !== undefined && is_available !== '') {
     where.push('is_available = ?');
     params.push(parseInt(is_available));
+  }
+  if (price_min !== undefined && price_min !== '') {
+    const v = parseFloat(price_min);
+    if (!Number.isNaN(v)) { where.push('price >= ?'); params.push(v); }
+  }
+  if (price_max !== undefined && price_max !== '') {
+    const v = parseFloat(price_max);
+    if (!Number.isNaN(v)) { where.push('price <= ?'); params.push(v); }
   }
 
   const whereSql = where.join(' AND ');
@@ -78,7 +94,7 @@ const updateDish = async (req, res) => {
   const image_url = req.file ? `/uploads/${req.file.filename}` : undefined;
 
   try {
-    const [existing] = await pool.query('SELECT id FROM dishes WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT id, image_url FROM dishes WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return fail(res, '菜品不存在', 404);
 
     const fields = [];
@@ -94,6 +110,12 @@ const updateDish = async (req, res) => {
 
     params.push(req.params.id);
     await pool.query(`UPDATE dishes SET ${fields.join(', ')} WHERE id = ?`, params);
+
+    // 更新了新图片，删除旧图片文件
+    if (image_url !== undefined && existing[0].image_url) {
+      deleteUploadedFile(existing[0].image_url);
+    }
+
     return success(res, null, '更新成功');
   } catch (err) {
     console.error('updateDish error:', err);

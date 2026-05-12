@@ -1,0 +1,166 @@
+<view class="page">
+  <!-- 愿望列表 -->
+  <scroll-view scroll-y class="wish-scroll" enable-passive>
+    <!-- 标题区 -->
+    <view class="activity-banner">
+      <view class="activity-title">{{activityTitle}}</view>
+      <view class="activity-status {{isActive ? 'active' : 'closed'}}">
+        {{isActive ? '活动进行中' : '活动已结束'}}
+      </view>
+    </view>
+
+    <!-- 加载中 -->
+    <view wx:if="{{loading}}" class="loading-wrap">
+      <van-loading type="spinner" color="#DC2626" size="48rpx" />
+    </view>
+
+    <!-- 空状态 -->
+    <view wx:elif="{{wishItems.length === 0}}" class="empty-area">
+      <view class="empty-icon">💭</view>
+      <view class="empty-title">还没有愿望</view>
+      <view wx:if="{{isActive}}" class="empty-sub">成为第一个许愿的人吧～</view>
+    </view>
+
+    <!-- 愿望列表 -->
+    <view wx:else class="wish-list">
+      <view
+        wx:for="{{wishItems}}"
+        wx:key="id"
+        class="wish-item {{expandedId === item.id ? 'expanded' : ''}}"
+      >
+        <!-- 愿望主体 -->
+        <view class="wish-main">
+          <!-- 排名徽标 -->
+          <view class="rank-badge {{index < 3 ? 'top' : ''}}">
+            <text wx:if="{{index === 0}}">🥇</text>
+            <text wx:elif="{{index === 1}}">🥈</text>
+            <text wx:elif="{{index === 2}}">🥉</text>
+            <text wx:else class="rank-num">{{index + 1}}</text>
+          </view>
+
+          <view class="wish-content">
+            <view class="wish-name">{{item.dish_name}}</view>
+            <view wx:if="{{item.description}}" class="wish-desc">{{item.description}}</view>
+            <view class="wish-meta">
+              <text class="wish-author">{{item.user_name || '匿名'}}</text>
+              <text class="wish-dot">·</text>
+              <text class="wish-time">{{item.createdAtStr}}</text>
+              <view wx:if="{{item.is_adopted}}" class="adopted-badge">已采纳</view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 操作栏：点赞 + 评论 -->
+        <view class="wish-actions">
+          <!-- 点赞按钮 -->
+          <view
+            class="action-btn like-btn {{item.has_voted ? 'liked' : ''}}"
+            bindtap="toggleLike"
+            data-id="{{item.id}}"
+            data-index="{{index}}"
+          >
+            <text class="action-icon">{{item.has_voted ? '❤️' : '🤍'}}</text>
+            <text class="action-count">{{item.vote_count}}</text>
+          </view>
+
+          <!-- 评论按钮 -->
+          <view
+            class="action-btn comment-btn {{expandedId === item.id ? 'active' : ''}}"
+            bindtap="toggleComments"
+            data-id="{{item.id}}"
+            data-index="{{index}}"
+          >
+            <text class="action-icon">💬</text>
+            <text class="action-count">{{item.comment_count || 0}}</text>
+          </view>
+        </view>
+
+        <!-- 评论展开区 -->
+        <view wx:if="{{expandedId === item.id}}" class="comment-section">
+          <van-loading wx:if="{{commentLoading}}" type="spinner" color="#DC2626" size="36rpx" style="display:block;padding:24rpx 0;text-align:center;" />
+
+          <view wx:elif="{{comments.length === 0}}" class="no-comments">暂无评论，快来说说你的想法</view>
+
+          <view wx:else class="comment-list">
+            <view wx:for="{{comments}}" wx:for-item="c" wx:key="id" class="comment-item">
+              <view class="comment-avatar">{{c.user_name ? c.user_name.slice(0,1) : '?'}}</view>
+              <view class="comment-body">
+                <view class="comment-header">
+                  <text class="comment-name">{{c.user_name || '用户'}}</text>
+                  <text class="comment-time">{{c.createdAtStr}}</text>
+                </view>
+                <view class="comment-text">{{c.content}}</view>
+              </view>
+              <view wx:if="{{c.user_id === myUserId}}" class="comment-del" bindtap="deleteComment" data-comment-id="{{c.id}}" data-item-id="{{item.id}}">
+                <van-icon name="delete-o" size="32rpx" color="#D1D5DB" />
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="scroll-bottom-space"></view>
+  </scroll-view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar">
+    <!-- 发许愿按钮（仅活动进行中） -->
+    <view wx:if="{{isActive && !showCommentInput}}" class="wish-fab" bindtap="showWishSheet">
+      <van-icon name="plus" size="40rpx" color="#fff" />
+      <text class="fab-text">我要许愿</text>
+    </view>
+
+    <!-- 评论输入框（点击评论按钮后显示） -->
+    <view wx:if="{{showCommentInput}}" class="comment-input-bar">
+      <input
+        class="comment-input"
+        placeholder="说说你的想法..."
+        value="{{commentText}}"
+        bindinput="onCommentInput"
+        focus="{{commentInputFocus}}"
+        maxlength="200"
+        placeholder-class="comment-placeholder"
+        confirm-type="send"
+        bindconfirm="submitComment"
+        adjust-position
+      />
+      <view class="comment-send {{commentText ? 'active' : ''}}" bindtap="submitComment">发送</view>
+    </view>
+  </view>
+
+  <!-- 许愿 Bottom Sheet -->
+  <van-popup show="{{showWishSheet}}" position="bottom" round bind:close="hideWishSheet">
+    <view class="sheet-header">
+      <view class="sheet-cancel" bindtap="hideWishSheet">取消</view>
+      <view class="sheet-title">我要许愿</view>
+      <view class="sheet-confirm {{wishName ? 'active' : ''}}" bindtap="submitWish">提交</view>
+    </view>
+    <view class="sheet-body">
+      <view class="sheet-field">
+        <view class="sheet-label">想吃什么 *</view>
+        <input
+          class="sheet-input"
+          placeholder="写下你想吃的菜品名称"
+          value="{{wishName}}"
+          bindinput="onWishInput"
+          data-key="wishName"
+          maxlength="50"
+          focus="{{showWishSheet}}"
+        />
+      </view>
+      <view class="sheet-field">
+        <view class="sheet-label">补充说明</view>
+        <textarea
+          class="sheet-textarea"
+          placeholder="可以说说口味偏好或做法（选填）"
+          value="{{wishDesc}}"
+          bindinput="onWishInput"
+          data-key="wishDesc"
+          maxlength="100"
+        />
+      </view>
+      <view class="sheet-tip">每次活动最多提交 3 个愿望</view>
+    </view>
+  </van-popup>
+</view>

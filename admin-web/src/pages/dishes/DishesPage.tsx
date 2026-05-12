@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react'
 import {
   Table, Button, Space, Tag, Image, Modal, Form, Input, InputNumber,
   Select, Upload, Switch, message, Typography, Popconfirm, App,
-  Card, Tooltip, Pagination, Empty,
+  Tooltip, Pagination, Empty, Row, Col, Card,
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
   CheckCircleOutlined, StopOutlined, AppstoreOutlined, UnorderedListOutlined,
+  PictureOutlined, ReloadOutlined,
 } from '@ant-design/icons'
 import { dishesApi } from '../../api/dishes'
+import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -30,6 +32,10 @@ export default function DishesPage() {
   const [fileList, setFileList] = useState<any[]>([])
   const [filterCategory, setFilterCategory] = useState<string>()
   const [filterKeyword, setFilterKeyword] = useState<string>()
+  const [filterIsAvailable, setFilterIsAvailable] = useState<number | undefined>()
+  const [filterPriceMin, setFilterPriceMin] = useState<number | undefined>()
+  const [filterPriceMax, setFilterPriceMax] = useState<number | undefined>()
+  const [dishToolbarKey, setDishToolbarKey] = useState(0)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
@@ -43,6 +49,9 @@ export default function DishesPage() {
         page: p, page_size: ps,
         category: filterCategory,
         keyword: filterKeyword,
+        ...(filterIsAvailable === 0 || filterIsAvailable === 1 ? { is_available: filterIsAvailable } : {}),
+        ...(filterPriceMin != null && !Number.isNaN(filterPriceMin) ? { price_min: filterPriceMin } : {}),
+        ...(filterPriceMax != null && !Number.isNaN(filterPriceMax) ? { price_max: filterPriceMax } : {}),
       })
       setData(res.data.list)
       setTotal(res.data.total)
@@ -51,7 +60,17 @@ export default function DishesPage() {
     }
   }
 
-  useEffect(() => { fetchData(1); setPage(1) }, [filterCategory, filterKeyword])
+  useEffect(() => { fetchData(1); setPage(1) }, [filterCategory, filterKeyword, filterIsAvailable, filterPriceMin, filterPriceMax])
+
+  const resetDishListFilters = () => {
+    setFilterCategory(undefined)
+    setFilterKeyword(undefined)
+    setFilterIsAvailable(undefined)
+    setFilterPriceMin(undefined)
+    setFilterPriceMax(undefined)
+    setDishToolbarKey(k => k + 1)
+    setPage(1)
+  }
 
   const switchView = (mode: ViewMode) => {
     setViewMode(mode)
@@ -153,6 +172,12 @@ export default function DishesPage() {
     {
       title: '图片', dataIndex: 'image_url',
       width: 80, align: 'center' as const,
+      filters: [
+        { text: '有图', value: 'yes' },
+        { text: '无图', value: 'no' },
+      ],
+      onFilter: (v: any, r: any) =>
+        v === 'yes' ? !!r.image_url : v === 'no' ? !r.image_url : true,
       render: (url: string) => url
         ? <Image src={url} width={48} height={48} style={{ borderRadius: 6, objectFit: 'cover', display: 'block', margin: '0 auto' }} />
         : <div style={{ width: 48, height: 48, background: '#f0f0f0', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bfbfbf', fontSize: 20, margin: '0 auto' }}>🍽</div>,
@@ -212,7 +237,7 @@ export default function DishesPage() {
       ),
     },
     {
-      title: '操作', width: 150, align: 'center' as const,
+      title: '操作', width: 150, align: 'left' as const,
       render: (_: any, record: any) => (
         <Space size={4}>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</Button>
@@ -326,9 +351,12 @@ export default function DishesPage() {
       {!loading && data.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
           <Pagination
-            current={page} total={total} pageSize={pageSize}
-            showSizeChanger showTotal={t => `共 ${t} 条`}
-            onChange={(p, ps) => { setPage(p); setPageSize(ps); fetchData(p, ps) }}
+            {...standardTablePagination({
+              current: page,
+              total,
+              pageSize,
+              onChange: (p, ps) => { setPage(p); setPageSize(ps); fetchData(p, ps) },
+            })}
           />
         </div>
       )}
@@ -336,35 +364,49 @@ export default function DishesPage() {
   )
 
   return (
-    <div>
-      {/* 页头 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>菜品管理</Title>
-        <Space>
-          {hasSelected && (
-            <>
-              <Text type="secondary">已选 <Text strong style={{ color: '#1890ff' }}>{selectedRowKeys.length}</Text> 项</Text>
-              <Button icon={<CheckCircleOutlined />} loading={batchLoading} onClick={() => handleBatchSetAvailable(1)}>批量上架</Button>
-              <Button icon={<StopOutlined />} loading={batchLoading} onClick={() => handleBatchSetAvailable(0)}>批量下架</Button>
-              <Button danger icon={<DeleteOutlined />} loading={batchLoading} onClick={handleBatchDelete}>批量删除</Button>
-            </>
-          )}
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增菜品</Button>
-        </Space>
-      </div>
-
-      <Card styles={{ body: { paddingBottom: 0 } }}>
-        {/* 筛选栏 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <>
+      <PageListShell
+        title="菜品管理"
+        headerExtra={
           <Space>
-            <Select placeholder="全部分类" allowClear style={{ width: 130 }}
+            {hasSelected && (
+              <>
+                <Text type="secondary">已选 <Text strong style={{ color: '#1890ff' }}>{selectedRowKeys.length}</Text> 项</Text>
+                <Button icon={<CheckCircleOutlined />} loading={batchLoading} onClick={() => handleBatchSetAvailable(1)}>批量上架</Button>
+                <Button icon={<StopOutlined />} loading={batchLoading} onClick={() => handleBatchSetAvailable(0)}>批量下架</Button>
+                <Button danger icon={<DeleteOutlined />} loading={batchLoading} onClick={handleBatchDelete}>批量删除</Button>
+              </>
+            )}
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增菜品</Button>
+          </Space>
+        }
+        filterLeft={
+          <>
+            <Text type="secondary" style={{ fontSize: 13 }}>分类</Text>
+            <Select placeholder="全部" allowClear style={{ width: 120 }}
               onChange={v => setFilterCategory(v)} value={filterCategory}>
               {CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
             </Select>
-            <Input.Search placeholder="搜索菜品名" onSearch={setFilterKeyword} allowClear style={{ width: 200 }} />
-          </Space>
-          {/* 视图切换 */}
-          <Space.Compact>
+            <Text type="secondary" style={{ fontSize: 13 }}>名称</Text>
+            <Input.Search key={`d-lk-${dishToolbarKey}`} placeholder="搜索菜品名" onSearch={v => setFilterKeyword(v || undefined)} allowClear style={{ width: 180 }} />
+            <Text type="secondary" style={{ fontSize: 13 }}>上架</Text>
+            <Select placeholder="全部" allowClear style={{ width: 100 }} value={filterIsAvailable}
+              onChange={v => setFilterIsAvailable(v)}
+              options={[{ label: '上架', value: 1 }, { label: '下架', value: 0 }]}
+            />
+            <Text type="secondary" style={{ fontSize: 13 }}>价格</Text>
+            <InputNumber min={0} placeholder="最低" style={{ width: 88 }} value={filterPriceMin}
+              onChange={v => setFilterPriceMin(v === null ? undefined : Number(v))} />
+            <Text type="secondary" style={{ fontSize: 13 }}>~</Text>
+            <InputNumber min={0} placeholder="最高" style={{ width: 88 }} value={filterPriceMax}
+              onChange={v => setFilterPriceMax(v === null ? undefined : Number(v))} />
+          </>
+        }
+        filterRight={
+          <Space>
+            <Button onClick={resetDishListFilters}>重置筛选</Button>
+            <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
+            <Space.Compact>
             <Tooltip title="列表视图">
               <Button
                 icon={<UnorderedListOutlined />}
@@ -380,9 +422,9 @@ export default function DishesPage() {
               />
             </Tooltip>
           </Space.Compact>
-        </div>
-
-        {/* 列表 / 卡片 视图 */}
+          </Space>
+        }
+      >
         {viewMode === 'list' ? (
           <Table
             rowKey="id"
@@ -395,56 +437,151 @@ export default function DishesPage() {
               selectedRowKeys,
               onChange: keys => setSelectedRowKeys(keys as number[]),
             }}
-            pagination={{
-              current: page, total, pageSize,
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50'],
-              showTotal: t => `共 ${t} 条`,
+            pagination={standardTablePagination({
+              current: page,
+              total,
+              pageSize,
               onChange: (p, ps) => { setPage(p); setPageSize(ps); fetchData(p, ps) },
-            }}
+            })}
           />
         ) : (
           <div style={{ paddingBottom: 24 }}>
             {renderCardView()}
           </div>
         )}
-      </Card>
+      </PageListShell>
 
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingId ? '编辑菜品' : '新增菜品'}
         open={modalOpen}
-        onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
-        okText="保存" cancelText="取消"
+        width={460}
+        destroyOnHidden
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 30, height: 30,
+              borderRadius: 8,
+              background: editingId ? '#EFF6FF' : '#F0FDF4',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              {editingId
+                ? <EditOutlined style={{ color: '#1677ff', fontSize: 14 }} />
+                : <PlusOutlined style={{ color: '#16a34a', fontSize: 14 }} />
+              }
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', lineHeight: 1.3 }}>
+                {editingId ? '编辑菜品' : '新增菜品'}
+              </div>
+              <div style={{ fontSize: 12, color: '#94A3B8', fontWeight: 400, marginTop: 1 }}>
+                {editingId ? '修改后点击保存生效' : '填写信息后即可创建'}
+              </div>
+            </div>
+          </div>
+        }
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button onClick={() => setModalOpen(false)}>取消</Button>
+            <Button
+              type="primary"
+              onClick={handleSubmit}
+              icon={editingId ? <EditOutlined /> : <PlusOutlined />}
+            >
+              {editingId ? '保存修改' : '创建菜品'}
+            </Button>
+          </div>
+        }
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="菜品名称" rules={[{ required: true, message: '请输入菜品名称' }]}>
+          {/* 菜品名称 */}
+          <Form.Item
+            name="name"
+            label="菜品名称"
+            rules={[{ required: true, message: '请输入菜品名称' }]}
+          >
             <Input placeholder="请输入菜品名称" />
           </Form.Item>
-          <Form.Item name="price" label="价格（元）" rules={[{ required: true, message: '请输入价格' }]}>
-            <InputNumber min={0.01} step={0.5} style={{ width: '100%' }} precision={2} placeholder="0.00" />
+
+          {/* 价格 + 分类 并排 */}
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item
+                name="price"
+                label="价格（元）"
+                rules={[{ required: true, message: '请输入价格' }]}
+              >
+                <InputNumber
+                  min={0.01} step={0.5} precision={2}
+                  placeholder="0.00"
+                  prefix="¥"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="category" label="分类" initialValue="其他">
+                <Select>
+                  {CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* 描述 */}
+          <Form.Item name="description" label="描述（可选）">
+            <Input.TextArea
+              rows={2}
+              placeholder="简短介绍菜品口味、特点等"
+              style={{ resize: 'none' }}
+            />
           </Form.Item>
-          <Form.Item name="category" label="分类" initialValue="其他">
-            <Select>
-              {CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
-            </Select>
+
+          {/* 上架状态 — 独占一行 */}
+          <Form.Item label="上架状态">
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '9px 14px',
+              background: '#F8FAFC',
+              borderRadius: 8,
+              border: '1px solid #E2E8F0',
+            }}>
+              <Form.Item name="is_available" valuePropName="checked" noStyle>
+                <Switch checkedChildren="上架" unCheckedChildren="下架" />
+              </Form.Item>
+              <span style={{ fontSize: 13, color: '#64748B' }}>
+                控制菜品在点餐小程序中的可见状态
+              </span>
+            </div>
           </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={2} placeholder="可选，简短介绍菜品" />
-          </Form.Item>
-          <Form.Item name="is_available" label="上架状态" valuePropName="checked" initialValue={true}>
-            <Switch checkedChildren="上架" unCheckedChildren="下架" />
-          </Form.Item>
-          <Form.Item label="菜品图片">
-            <Upload listType="picture-card" fileList={fileList} maxCount={1}
-              beforeUpload={() => false}
-              onChange={({ fileList }) => setFileList(fileList)}>
-              {fileList.length === 0 && <div><UploadOutlined /><div style={{ marginTop: 8 }}>上传图片</div></div>}
-            </Upload>
+
+          {/* 菜品图片 — 独占一行 */}
+          <Form.Item label="菜品图片" style={{ marginBottom: 0 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <Upload
+                listType="picture-card"
+                fileList={fileList}
+                maxCount={1}
+                beforeUpload={() => false}
+                onChange={({ fileList }) => setFileList(fileList)}
+              >
+                {fileList.length === 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, color: '#94A3B8' }}>
+                    <PictureOutlined style={{ fontSize: 20 }} />
+                    <span style={{ fontSize: 12 }}>点击上传</span>
+                  </div>
+                )}
+              </Upload>
+              <span style={{ fontSize: 12, color: '#94A3B8', lineHeight: 1.6, marginTop: 4 }}>
+                支持 JPG / PNG<br />建议尺寸 400×400
+              </span>
+            </div>
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </>
   )
 }

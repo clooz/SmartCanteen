@@ -1,6 +1,14 @@
 const { pool } = require('../db/connection');
 const { success, fail } = require('../utils/response');
 
+function toMySQLDateTime(input) {
+  if (!input) return null;
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 // ───────── 许愿活动 ─────────
 
 // 获取活动列表
@@ -41,12 +49,15 @@ const getActivities = async (req, res) => {
 const createActivity = async (req, res) => {
   const { title, description, start_at, end_at } = req.body;
   if (!title || !start_at || !end_at) return fail(res, '标题、开始时间和截止时间不能为空');
-  if (new Date(end_at) <= new Date(start_at)) return fail(res, '截止时间必须晚于开始时间');
+  const startAt = toMySQLDateTime(start_at);
+  const endAt = toMySQLDateTime(end_at);
+  if (!startAt || !endAt) return fail(res, '时间格式不正确');
+  if (new Date(endAt) <= new Date(startAt)) return fail(res, '截止时间必须晚于开始时间');
 
   try {
     const [result] = await pool.query(
       'INSERT INTO wish_activities (title, description, start_at, end_at, created_by) VALUES (?, ?, ?, ?, ?)',
-      [title, description || '', start_at, end_at, req.user.id]
+      [title, description || '', startAt, endAt, req.user.id]
     );
     return success(res, { id: result.insertId }, '活动创建成功', 201);
   } catch (err) {
@@ -71,7 +82,7 @@ const closeActivity = async (req, res) => {
 
 // ───────── 许愿条目 ─────────
 
-// 获取某活动的愿望列表（按票数排序）
+// 获取某活动的愿望列表（按点赞数排序）
 const getWishItems = async (req, res) => {
   const activityId = req.params.activity_id;
 
@@ -84,7 +95,8 @@ const getWishItems = async (req, res) => {
               EXISTS(
                 SELECT 1 FROM wish_votes wv
                 WHERE wv.wish_item_id = wi.id AND wv.user_id = ?
-              ) AS has_voted
+              ) AS has_voted,
+              (SELECT COUNT(*) FROM wish_item_comments wc WHERE wc.wish_item_id = wi.id) AS comment_count
        FROM wish_items wi
        LEFT JOIN users u ON wi.user_id = u.id
        WHERE wi.activity_id = ?
@@ -270,4 +282,88 @@ const adoptWishItem = async (req, res) => {
   }
 };
 
-module.exports = { getActivities, createActivity, closeActivity, getWishItems, createWishItem, voteWishItem, unvoteWishItem, adoptWishItem };
+// ───────── 评论 ─────────
+
+// 获取某愿望的评论列表
+const getComments = async (req, res) => {
+  const wishItemId = req.params.item_id;
+  try {
+    const [item] = await pool.query('SELECT id FROM wish_items WHERE id = ?', [wishItemId]);
+    if (item.length === 0) return fail(res, '愿望不存在', 404);
+
+    const [rows] = await pool.query(
+      `SELECT c.id, c.content, c.created_at,
+              u.nickname AS user_name, u.id AS user_id
+       FROM wish_item_comments c
+       LEFT JOIN users u ON c.user_id = u.id
+       WHERE c.wish_item_id = ?
+       ORDER BY c.created_at ASC`,
+      [wishItemId]
+    );
+    return success(res, rows);
+  } catch (err) {
+    console.error('getComments error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
+// 发表评论（所有登录用户，活动进行中才可评论）
+const createComment = async (req, res) => {
+  const wishItemId = req.params.item_id;
+  const { content } = req.body;
+
+  if (!content || !content.trim()) return fail(res, '评论内容不能为空');
+  if (content.length > 200) return fail(res, '评论内容不能超过200字');
+
+  try {
+    const [items] = await pool.query(
+      `SELECT wi.id, wa.status AS activity_status
+       FROM wish_items wi
+       JOIN wish_activities wa ON wi.activity_id = wa.id
+       WHERE wi.id = ?`,
+      [wishItemId]
+    );
+    if (items.length === 0) return fail(res, '愿望不存在', 404);
+    if (items[0].activity_status !== 'active') return fail(res, '活动已结束，无法评论');
+
+    const [result] = await pool.query(
+      'INSERT INTO wish_item_comments (wish_item_id, user_id, content) VALUES (?, ?, ?)',
+      [wishItemId, req.user.id, content.trim()]
+    );
+
+    const [[newComment]] = await pool.query(
+      `SELECT c.id, c.content, c.created_at, u.nickname AS user_name, u.id AS user_id
+       FROM wish_item_comments c LEFT JOIN users u ON c.user_id = u.id
+       WHERE c.id = ?`,
+      [result.insertId]
+    );
+    return success(res, newComment, '评论成功', 201);
+  } catch (err) {
+    console.error('createComment error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
+// 删除自己的评论
+const deleteComment = async (req, res) => {
+  const { item_id, comment_id } = req.params;
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, user_id FROM wish_item_comments WHERE id = ? AND wish_item_id = ?',
+      [comment_id, item_id]
+    );
+    if (rows.length === 0) return fail(res, '评论不存在', 404);
+
+    const isOwner = rows[0].user_id === req.user.id;
+    const isAdmin = ['admin', 'chef'].includes(req.user.role);
+    if (!isOwner && !isAdmin) return fail(res, '无权删除他人评论', 403);
+
+    await pool.query('DELETE FROM wish_item_comments WHERE id = ?', [comment_id]);
+    return success(res, null, '评论已删除');
+  } catch (err) {
+    console.error('deleteComment error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
+module.exports = { getActivities, createActivity, closeActivity, getWishItems, createWishItem, voteWishItem, unvoteWishItem, adoptWishItem, getComments, createComment, deleteComment };

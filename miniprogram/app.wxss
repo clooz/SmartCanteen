@@ -1,0 +1,135 @@
+/* ===== SmartCanteen 全局样式 =====
+   设计系统：企业蓝白配色（UI Skill · Trust & Authority）
+   Primary:    #0891B2  青蓝
+   PrimaryDark:#0369A1  深蓝
+   Secondary:  #22D3EE  亮青
+   Background: #F0FDFF  近白蓝
+   Surface:    #FFFFFF
+   Text:       #164E63  深蓝文字
+   TextMuted:  #6B7280
+   Border:     #CFFAFE
+   ================================ */
+
+page {
+  --color-primary:       #0891B2;
+  --color-primary-dark:  #0369A1;
+  --color-primary-light: #E0F7FA;
+  --color-secondary:     #22D3EE;
+  --color-bg:            #F0FDFF;
+  --color-surface:       #FFFFFF;
+  --color-text:          #164E63;
+  --color-text-secondary:#6B7280;
+  --color-border:        #CFFAFE;
+  --color-success:       #22C55E;
+  --color-success-light: #DCFCE7;
+  --color-warning:       #D97706;
+  --color-warning-light: #FEF3C7;
+  --color-error:         #EF4444;
+  --color-error-light:   #FEE2E2;
+
+  --radius-sm:   8rpx;
+  --radius-md:   16rpx;
+  --radius-lg:   24rpx;
+  --radius-xl:   32rpx;
+  --radius-full: 9999rpx;
+
+  --shadow-sm: 0 2rpx 8rpx  rgba(8, 145, 178, 0.08);
+  --shadow-md: 0 4rpx 16rpx rgba(8, 145, 178, 0.12);
+  --shadow-lg: 0 8rpx 32rpx rgba(8, 145, 178, 0.16);
+
+  --spacing-xs: 8rpx;
+  --spacing-sm: 16rpx;
+  --spacing-md: 24rpx;
+  --spacing-lg: 32rpx;
+  --spacing-xl: 48rpx;
+
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  font-size: 30rpx;
+  line-height: 1.6;
+}
+
+/* ===== 工具类 ===== */
+.flex            { display: flex; }
+.flex-col        { display: flex; flex-direction: column; }
+.items-center    { align-items: center; }
+.justify-center  { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.flex-1          { flex: 1; }
+.text-center     { text-align: center; }
+.text-primary    { color: var(--color-primary); }
+.text-secondary  { color: var(--color-text-secondary); }
+.font-bold       { font-weight: 700; }
+.font-medium     { font-weight: 500; }
+
+/* ===== 通用卡片 ===== */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* ===== 页面容器 ===== */
+.page-container {
+  min-height: 100vh;
+  background: var(--color-bg);
+  padding-bottom: 32rpx;
+}
+
+/* ===== 状态徽标 ===== */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 18rpx;
+  border-radius: var(--radius-full);
+  font-size: 24rpx;
+  font-weight: 500;
+}
+.status-badge.pending { background: var(--color-warning-light); color: var(--color-warning); }
+.status-badge.success { background: var(--color-success-light); color: var(--color-success); }
+.status-badge.error   { background: var(--color-error-light);   color: var(--color-error); }
+
+/* ===== 主按钮 ===== */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0891B2, #0369A1);
+  color: #fff;
+  border-radius: var(--radius-full);
+  font-size: 32rpx;
+  font-weight: 600;
+  height: 96rpx;
+  letter-spacing: 2rpx;
+  box-shadow: var(--shadow-md);
+}
+.btn-primary:active { opacity: 0.88; }
+
+/* ===== 分割线 ===== */
+.divider {
+  height: 1rpx;
+  background: var(--color-border);
+  margin: 0 32rpx;
+}
+
+/* ===== 空状态 ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 40rpx;
+  color: var(--color-text-secondary);
+}
+.empty-state .empty-icon  { font-size: 80rpx; margin-bottom: 24rpx; opacity: 0.4; }
+.empty-state .empty-text  { font-size: 28rpx; text-align: center; line-height: 1.8; }
+
+/* ===== 加载中 ===== */
+.loading-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60rpx 0;
+}

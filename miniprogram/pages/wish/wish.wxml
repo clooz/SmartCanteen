@@ -1,0 +1,51 @@
+<view class="page">
+  <view class="header">
+    <view class="header-title">许愿活动</view>
+    <view class="header-sub">为食堂菜单投票，心愿成真！</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-wrap">
+    <van-loading type="spinner" color="#DC2626" size="48rpx" />
+  </view>
+
+  <view wx:elif="{{activities.length === 0}}" class="empty-area">
+    <view class="empty-icon">🌟</view>
+    <view class="empty-title">暂无许愿活动</view>
+    <view class="empty-sub">等待食堂发起活动，快来许愿吧～</view>
+  </view>
+
+  <scroll-view wx:else scroll-y class="activity-scroll" enable-passive>
+    <view
+      wx:for="{{activities}}"
+      wx:key="id"
+      class="activity-card {{item.status === 'closed' ? 'closed' : ''}}"
+      bindtap="goDetail"
+      data-id="{{item.id}}"
+      data-title="{{item.title}}"
+    >
+      <view class="card-top">
+        <view class="card-status-badge {{item.status === 'active' ? 'active' : 'closed'}}">
+          {{item.status === 'active' ? '进行中' : '已结束'}}
+        </view>
+        <view wx:if="{{item.status === 'active'}}" class="card-countdown">{{item.countdown}}</view>
+      </view>
+
+      <view class="card-title">{{item.title}}</view>
+      <view wx:if="{{item.description}}" class="card-desc">{{item.description}}</view>
+
+      <view class="card-footer">
+        <view class="card-meta">
+          <van-icon name="friends-o" size="28rpx" color="#9CA3AF" />
+          <text class="meta-text">{{item.item_count || 0}} 个愿望</text>
+        </view>
+        <view class="card-meta">
+          <van-icon name="clock-o" size="28rpx" color="#9CA3AF" />
+          <text class="meta-text">截止 {{item.endAtStr}}</text>
+        </view>
+        <view class="card-arrow">›</view>
+      </view>
+    </view>
+
+    <view class="list-end">共 {{activities.length}} 个活动</view>
+  </scroll-view>
+</view>

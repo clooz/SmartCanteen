@@ -42,20 +42,20 @@ export default function App() {
       theme={{
         algorithm: themeMode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
-          // 主色：拂晓蓝
-          colorPrimary: '#1890ff',
-          colorLink: '#1890ff',
-          colorLinkHover: '#40a9ff',
-          colorLinkActive: '#096dd9',
+          // 主色：现代蓝
+          colorPrimary: '#1677ff',
+          colorLink: '#1677ff',
+          colorLinkHover: '#4096ff',
+          colorLinkActive: '#0958d9',
 
-          // 圆角：现代感
+          // 圆角
           borderRadius: 8,
-          borderRadiusLG: 12,
+          borderRadiusLG: 10,
           borderRadiusSM: 6,
           borderRadiusXS: 4,
 
-          // 字体
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif",
+          // 字体：Inter + 中文降级
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif",
           fontSize: 14,
           fontSizeLG: 16,
           fontSizeHeading4: 18,
@@ -71,16 +71,16 @@ export default function App() {
           marginLG: 24,
           marginSM: 12,
 
-          // 阴影
-          boxShadow: '0 1px 3px 0 rgba(0,0,0,0.08), 0 1px 2px -1px rgba(0,0,0,0.06)',
-          boxShadowSecondary: '0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05)',
+          // 阴影 — 轻量、克制
+          boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)',
+          boxShadowSecondary: '0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.04)',
 
-          // 背景
-          colorBgLayout: '#f5f7fa',
+          // 背景：极淡蓝灰
+          colorBgLayout: '#F5F7FA',
 
-          // 边框
-          colorBorder: '#e5e7eb',
-          colorBorderSecondary: '#f3f4f6',
+          // 边框：更柔和
+          colorBorder: '#E2E8F0',
+          colorBorderSecondary: '#EEF2F7',
 
           // 控件高度
           controlHeight: 36,
@@ -90,37 +90,46 @@ export default function App() {
         components: {
           Button: {
             fontWeight: 500,
-            primaryShadow: '0 2px 8px rgba(24,144,255,0.35)',
+            primaryShadow: 'none',
           },
           Card: {
             paddingLG: 20,
+            boxShadowTertiary: '0 1px 2px 0 rgba(0,0,0,0.04)',
           },
           Table: {
-            headerBg: '#fafafa',
-            headerColor: '#6b7280',
-            headerSortActiveBg: '#fafafa',
-            rowHoverBg: '#f0f7ff',
-            borderColor: '#f0f0f0',
+            headerBg: '#F8FAFC',
+            headerColor: '#64748B',
+            headerSortActiveBg: '#F8FAFC',
+            rowHoverBg: '#F0F6FF',
+            borderColor: '#EEF2F7',
+            headerSplitColor: 'transparent',
           },
           Menu: {
-            itemBorderRadius: 8,
+            itemBorderRadius: 7,
             itemMarginInline: 8,
             subMenuItemBg: 'transparent',
+            itemActiveBg: '#EFF6FF',
+            itemSelectedBg: '#EFF6FF',
+            itemSelectedColor: '#1677ff',
           },
           Input: {
-            activeShadow: '0 0 0 2px rgba(24,144,255,0.12)',
+            activeShadow: '0 0 0 3px rgba(22,119,255,0.10)',
+            borderRadius: 8,
           },
           Select: {
-            optionSelectedBg: '#e6f4ff',
+            optionSelectedBg: '#EFF6FF',
           },
           Tag: {
-            borderRadiusSM: 6,
+            borderRadiusSM: 5,
           },
           Modal: {
             borderRadiusLG: 12,
           },
           Drawer: {
             borderRadius: 12,
+          },
+          Statistic: {
+            titleFontSize: 13,
           },
         },
       }}
@@ -139,8 +148,8 @@ export default function App() {
               <Route path="dishes" element={<DishesPage />} />
               <Route path="menus" element={<MenusPage />} />
               <Route path="wish" element={<WishPage />} />
-              <Route path="orders" element={<PrivateRoute roles={['admin']}><OrdersPage /></PrivateRoute>} />
-              <Route path="report" element={<PrivateRoute roles={['admin']}><ReportPage /></PrivateRoute>} />
+              <Route path="orders" element={<PrivateRoute roles={['admin', 'chef']}><OrdersPage /></PrivateRoute>} />
+              <Route path="report" element={<PrivateRoute roles={['admin', 'chef']}><ReportPage /></PrivateRoute>} />
               <Route path="recharge" element={<PrivateRoute roles={['admin']}><RechargePage /></PrivateRoute>} />
               <Route path="users" element={<PrivateRoute roles={['admin']}><UsersPage /></PrivateRoute>} />
               <Route path="companies" element={<PrivateRoute roles={['admin']}><CompaniesPage /></PrivateRoute>} />

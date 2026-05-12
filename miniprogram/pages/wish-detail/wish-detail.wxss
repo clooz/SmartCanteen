@@ -1,0 +1,243 @@
+.page {
+  min-height: 100vh;
+  background: #F0FDFF;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 120rpx;
+}
+
+/* ===== 活动信息横幅 ===== */
+.activity-banner {
+  background: linear-gradient(135deg, #0891B2, #0369A1);
+  padding: 32rpx 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.activity-title { font-size: 34rpx; font-weight: 700; color: #FFFFFF; flex: 1; }
+.activity-status {
+  font-size: 22rpx;
+  font-weight: 600;
+  padding: 6rpx 20rpx;
+  border-radius: 24rpx;
+}
+.activity-status.active { background: rgba(255,255,255,0.25); color: #FFFFFF; }
+.activity-status.closed { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.7); }
+
+/* ===== 滚动区域 ===== */
+.wish-scroll { flex: 1; }
+.loading-wrap { display: flex; justify-content: center; padding: 80rpx 0; }
+.empty-area { display: flex; flex-direction: column; align-items: center; padding: 80rpx 40rpx; }
+.empty-icon { font-size: 80rpx; margin-bottom: 24rpx; opacity: 0.5; }
+.empty-title { font-size: 32rpx; font-weight: 600; color: #374151; margin-bottom: 12rpx; }
+.empty-sub { font-size: 26rpx; color: #9CA3AF; }
+
+/* ===== 愿望列表 ===== */
+.wish-list { padding: 20rpx 32rpx; }
+
+.wish-item {
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(8,145,178,0.06);
+  overflow: hidden;
+}
+.wish-item.expanded { box-shadow: 0 4rpx 16rpx rgba(8,145,178,0.12); }
+
+.wish-main {
+  display: flex;
+  align-items: flex-start;
+  padding: 28rpx;
+}
+
+/* 排名徽标 */
+.rank-badge {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 20rpx;
+  font-size: 36rpx;
+}
+.rank-badge.top { font-size: 40rpx; }
+.rank-num {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #9CA3AF;
+}
+
+/* 愿望内容 */
+.wish-content { flex: 1 }
+.wish-name { font-size: 32rpx; font-weight: 700; color: #164E63; margin-bottom: 8rpx; }
+.wish-desc { font-size: 26rpx; color: #6B7280; margin-bottom: 12rpx; line-height: 1.5; }
+.wish-meta { display: flex; align-items: center; gap: 8rpx; flex-wrap: wrap; }
+.wish-author { font-size: 24rpx; color: #9CA3AF; }
+.wish-dot { color: #D1D5DB; }
+.wish-time { font-size: 24rpx; color: #D1D5DB; }
+.adopted-badge {
+  font-size: 20rpx;
+  color: #16A34A;
+  background: #DCFCE7;
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
+  font-weight: 600;
+}
+
+/* ===== 操作栏 ===== */
+.wish-actions {
+  display: flex;
+  border-top: 1rpx solid #F0FDFF;
+  padding: 0 28rpx;
+}
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 20rpx 24rpx 20rpx 0;
+  margin-right: 16rpx;
+  min-width: 88rpx;
+}
+.action-btn:active { opacity: 0.7; }
+.action-icon { font-size: 36rpx; }
+.action-count { font-size: 28rpx; color: #6B7280; font-weight: 500; }
+
+.like-btn.liked .action-count { color: #0891B2; }
+.comment-btn.active .action-count { color: #0891B2; }
+
+/* ===== 评论展开区 ===== */
+.comment-section {
+  background: #F0FDFF;
+  border-top: 1rpx solid #CFFAFE;
+  padding: 16rpx 28rpx;
+}
+.no-comments { font-size: 26rpx; color: #D1D5DB; text-align: center; padding: 24rpx 0; }
+
+.comment-list { display: flex; flex-direction: column; gap: 0; }
+.comment-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #CFFAFE;
+}
+.comment-item:last-child { border-bottom: none; }
+
+.comment-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #E0F7FA, #BAE6FD);
+  color: #0891B2;
+  font-size: 24rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 16rpx;
+}
+.comment-body { flex: 1 }
+.comment-header { display: flex; align-items: center; gap: 12rpx; margin-bottom: 8rpx; }
+.comment-name { font-size: 26rpx; font-weight: 600; color: #374151; }
+.comment-time { font-size: 22rpx; color: #D1D5DB; }
+.comment-text { font-size: 28rpx; color: #374151; line-height: 1.6; }
+.comment-del { padding: 8rpx; }
+
+/* ===== 底部操作栏 ===== */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16rpx 32rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: #FFFFFF;
+  border-top: 1rpx solid #CFFAFE;
+  box-shadow: 0 -4rpx 16rpx rgba(8,145,178,0.06);
+  z-index: 100;
+}
+
+/* 许愿 FAB 按钮 */
+.wish-fab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: linear-gradient(135deg, #0891B2, #0369A1);
+  border-radius: 48rpx;
+  height: 88rpx;
+  box-shadow: 0 6rpx 20rpx rgba(8,145,178,0.35);
+}
+.wish-fab:active { opacity: 0.88; }
+.fab-text { font-size: 30rpx; font-weight: 700; color: #FFFFFF; letter-spacing: 2rpx; }
+
+/* 评论输入框 */
+.comment-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: #F0FDFF;
+  border-radius: 48rpx;
+  padding: 14rpx 20rpx;
+  border: 2rpx solid #CFFAFE;
+}
+.comment-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #164E63;
+  background: transparent;
+  border: none;
+  height: 60rpx;
+}
+.comment-placeholder { color: #D1D5DB; }
+.comment-send {
+  font-size: 28rpx;
+  color: #D1D5DB;
+  font-weight: 600;
+  padding: 8rpx 16rpx;
+  transition: color 0.2s;
+}
+.comment-send.active { color: #0891B2; }
+
+/* ===== 许愿 Sheet ===== */
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx 40rpx;
+  border-bottom: 1rpx solid #CFFAFE;
+}
+.sheet-cancel { font-size: 28rpx; color: #9CA3AF; }
+.sheet-title { font-size: 32rpx; font-weight: 700; color: #164E63; }
+.sheet-confirm { font-size: 28rpx; color: #D1D5DB; font-weight: 600; }
+.sheet-confirm.active { color: #0891B2; }
+
+.sheet-body { padding: 32rpx 40rpx 60rpx; }
+.sheet-field { margin-bottom: 32rpx; }
+.sheet-label { font-size: 26rpx; color: #6B7280; margin-bottom: 12rpx; }
+.sheet-input {
+  width: 100%;
+  height: 80rpx;
+  background: #F0FDFF;
+  border-radius: 12rpx;
+  padding: 0 24rpx;
+  font-size: 30rpx;
+  color: #164E63;
+  box-sizing: border-box;
+  border: 2rpx solid #CFFAFE;
+}
+.sheet-textarea {
+  width: 100%;
+  min-height: 120rpx;
+  background: #F0FDFF;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: #164E63;
+  box-sizing: border-box;
+  border: 2rpx solid #CFFAFE;
+}
+.sheet-tip { font-size: 24rpx; color: #D1D5DB; text-align: center; }
+
+.scroll-bottom-space { height: 40rpx; }

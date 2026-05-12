@@ -8,4 +8,8 @@ export const wishApi = {
     request.get(`/wish/activities/${activityId}/items`),
   adoptItem: (itemId: number, data: object) =>
     request.post(`/wish/items/${itemId}/adopt`, data),
+  getComments: (itemId: number) =>
+    request.get(`/wish/items/${itemId}/comments`),
+  deleteComment: (itemId: number, commentId: number) =>
+    request.delete(`/wish/items/${itemId}/comments/${commentId}`),
 }

@@ -19,6 +19,9 @@ const CREATE_TABLES = [
     role ENUM('employee', 'chef', 'admin') NOT NULL DEFAULT 'employee' COMMENT '角色',
     company_id INT DEFAULT NULL COMMENT '所属公司ID，厨师/管理员可为空',
     is_active TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    ext_uid VARCHAR(100) DEFAULT NULL UNIQUE COMMENT '外部平台用户ID（钉钉/企微/飞书/自研HR等）',
+    sync_source VARCHAR(50) DEFAULT NULL COMMENT '同步来源标识，如 dingtalk/wecom/feishu/hr',
+    synced_at DATETIME DEFAULT NULL COMMENT '最近一次从外部平台同步的时间',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
@@ -34,7 +37,8 @@ const CREATE_TABLES = [
     category VARCHAR(50) DEFAULT '其他' COMMENT '分类，如主食/荤菜/素菜/汤/饮料',
     is_available TINYINT(1) DEFAULT 1 COMMENT '是否上架',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dish_name (name)
   ) COMMENT='菜品表'`,
 
   // 每日菜单表
@@ -48,13 +52,14 @@ const CREATE_TABLES = [
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
   ) COMMENT='每日菜单表'`,
 
-  // 菜单-菜品关联表
+  // 菜单-菜品关联表（同一道菜可分别出现在早餐、午餐）
   `CREATE TABLE IF NOT EXISTS menu_dishes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     menu_id INT NOT NULL COMMENT '菜单ID',
     dish_id INT NOT NULL COMMENT '菜品ID',
+    meal_type ENUM('breakfast', 'lunch') NOT NULL DEFAULT 'lunch' COMMENT '餐次：早餐/午餐',
     stock INT DEFAULT NULL COMMENT '当日限量，NULL 表示不限',
-    UNIQUE KEY uk_menu_dish (menu_id, dish_id),
+    UNIQUE KEY uk_menu_dish_meal (menu_id, dish_id, meal_type),
     FOREIGN KEY (menu_id) REFERENCES daily_menus(id) ON DELETE CASCADE,
     FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE
   ) COMMENT='菜单-菜品关联表'`,
@@ -65,6 +70,7 @@ const CREATE_TABLES = [
     order_no VARCHAR(30) NOT NULL UNIQUE COMMENT '订单号',
     user_id INT NOT NULL COMMENT '下单用户ID',
     menu_id INT NOT NULL COMMENT '对应菜单ID',
+    meal_type ENUM('breakfast', 'lunch') NOT NULL DEFAULT 'lunch' COMMENT '餐次：早餐/午餐',
     total_amount DECIMAL(10, 2) NOT NULL COMMENT '订单总金额',
     status ENUM('pending', 'confirmed', 'ready', 'done', 'cancelled') DEFAULT 'pending' COMMENT '待接单/已接单/可取餐/已完成/已取消',
     remark VARCHAR(255) DEFAULT '' COMMENT '备注',
@@ -107,7 +113,7 @@ const CREATE_TABLES = [
     user_id INT NOT NULL COMMENT '提交用户ID',
     dish_name VARCHAR(100) NOT NULL COMMENT '期望菜品名称',
     description VARCHAR(255) DEFAULT '' COMMENT '补充描述',
-    vote_count INT DEFAULT 0 COMMENT '投票数',
+    vote_count INT DEFAULT 0 COMMENT '投点赞数',
     is_adopted TINYINT(1) DEFAULT 0 COMMENT '是否已被采纳',
     adopted_dish_id INT DEFAULT NULL COMMENT '采纳后关联的菜品ID',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -127,6 +133,17 @@ const CREATE_TABLES = [
     FOREIGN KEY (user_id) REFERENCES users(id)
   ) COMMENT='许愿投票记录表'`,
 
+  // 许愿评论表
+  `CREATE TABLE IF NOT EXISTS wish_item_comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    wish_item_id INT NOT NULL COMMENT '所属愿望条目ID',
+    user_id INT NOT NULL COMMENT '评论用户ID',
+    content VARCHAR(200) NOT NULL COMMENT '评论内容',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (wish_item_id) REFERENCES wish_items(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  ) COMMENT='许愿评论表'`,
+
   // 饭卡充值申请表
   `CREATE TABLE IF NOT EXISTS recharge_records (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -144,11 +161,126 @@ const CREATE_TABLES = [
   ) COMMENT='饭卡充值申请表'`,
 ];
 
+async function migrateSchema() {
+  const dbRows = await pool.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'menu_dishes' AND COLUMN_NAME = 'meal_type'`
+  );
+  const cols = dbRows[0];
+  if (!cols.length) {
+    console.log('🔄 迁移：menu_dishes 增加餐次 meal_type …');
+    await pool.query(
+      `ALTER TABLE menu_dishes ADD COLUMN meal_type ENUM('breakfast','lunch') NOT NULL DEFAULT 'lunch' COMMENT '餐次：早餐/午餐' AFTER dish_id`
+    );
+    try {
+      await pool.query('ALTER TABLE menu_dishes DROP INDEX uk_menu_dish');
+    } catch (_) { /* 新库可能无此索引 */ }
+    try {
+      await pool.query('ALTER TABLE menu_dishes DROP INDEX uk_menu_dish_meal');
+    } catch (_) { }
+    await pool.query(
+      'ALTER TABLE menu_dishes ADD UNIQUE KEY uk_menu_dish_meal (menu_id, dish_id, meal_type)'
+    );
+  }
+
+  const ordRows = await pool.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'meal_type'`
+  );
+  if (!ordRows[0].length) {
+    console.log('🔄 迁移：orders 增加餐次 meal_type …');
+    await pool.query(
+      `ALTER TABLE orders ADD COLUMN meal_type ENUM('breakfast','lunch') NOT NULL DEFAULT 'lunch' COMMENT '餐次：早餐/午餐' AFTER menu_id`
+    );
+  }
+
+  // dishes.name 唯一索引迁移
+  const dishNameIdx = await pool.query(
+    `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dishes' AND INDEX_NAME = 'uk_dish_name'`
+  );
+  if (!dishNameIdx[0].length) {
+    console.log('🔄 迁移：dishes 表清理重复菜品并添加 name 唯一索引 …');
+
+    // 查询所有重复菜品（保留 id 最小的原始版本，找出需要被替换掉的重复 id）
+    const [dupRows] = await pool.query(`
+      SELECT d1.id AS dup_id, d2.id AS keep_id
+      FROM dishes d1
+      INNER JOIN dishes d2 ON d1.name = d2.name AND d1.id > d2.id
+    `);
+
+    for (const { dup_id, keep_id } of dupRows) {
+      // 将 order_items 中指向重复菜品的 dish_id 改为原始菜品
+      await pool.query(
+        `UPDATE order_items SET dish_id = ? WHERE dish_id = ?`,
+        [keep_id, dup_id]
+      );
+      // 将 menu_dishes 中指向重复菜品的记录改为原始菜品（如冲突则直接删除重复关联）
+      await pool.query(
+        `UPDATE IGNORE menu_dishes SET dish_id = ? WHERE dish_id = ?`,
+        [keep_id, dup_id]
+      );
+      await pool.query(`DELETE FROM menu_dishes WHERE dish_id = ?`, [dup_id]);
+      // 删除重复菜品
+      await pool.query(`DELETE FROM dishes WHERE id = ?`, [dup_id]);
+    }
+
+    // 再添加唯一索引（若已存在则跳过）
+    try {
+      await pool.query('ALTER TABLE dishes ADD UNIQUE KEY uk_dish_name (name)');
+    } catch (e) {
+      if (e.code !== 'ER_DUP_KEYNAME') throw e;
+    }
+    console.log(`   ✅ ${dupRows.length} 条重复菜品已清理，唯一索引已添加`);
+  }
+
+  // 外部平台对接字段迁移
+  const userSyncCols = await pool.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+       AND COLUMN_NAME IN ('ext_uid','sync_source','synced_at')`
+  );
+  const existingSyncCols = new Set(userSyncCols[0].map((r) => r.COLUMN_NAME));
+  if (!existingSyncCols.has('ext_uid')) {
+    console.log('🔄 迁移：users 增加外部平台字段 ext_uid / sync_source / synced_at …');
+    await pool.query(
+      `ALTER TABLE users
+         ADD COLUMN ext_uid VARCHAR(100) DEFAULT NULL UNIQUE COMMENT '外部平台用户ID' AFTER is_active,
+         ADD COLUMN sync_source VARCHAR(50) DEFAULT NULL COMMENT '同步来源' AFTER ext_uid,
+         ADD COLUMN synced_at DATETIME DEFAULT NULL COMMENT '最近同步时间' AFTER sync_source`
+    );
+  }
+}
+
+async function migrateComments() {
+  const [tables] = await pool.query(
+    `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wish_item_comments'`
+  );
+  if (!tables.length) {
+    console.log('🔄 迁移：创建 wish_item_comments 评论表 …');
+    await pool.query(`
+      CREATE TABLE wish_item_comments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        wish_item_id INT NOT NULL COMMENT '所属愿望条目ID',
+        user_id INT NOT NULL COMMENT '评论用户ID',
+        content VARCHAR(200) NOT NULL COMMENT '评论内容',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (wish_item_id) REFERENCES wish_items(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      ) COMMENT='许愿评论表'
+    `);
+    console.log('   ✅ wish_item_comments 表已创建');
+  }
+}
+
 async function initDatabase() {
   console.log('📦 开始初始化数据库表...');
   for (const sql of CREATE_TABLES) {
     await pool.query(sql);
   }
+  await migrateSchema();
+  await migrateComments();
   console.log('✅ 数据库表初始化完成');
   await seedInitialData();
 }

@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Layout, Menu, Avatar, Dropdown, Typography, Button, theme, Tooltip } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, Typography, Button, theme, Tooltip, Breadcrumb } from 'antd'
 import {
   ShopOutlined, CalendarOutlined, UnorderedListOutlined,
   BarChartOutlined, TeamOutlined, BankOutlined, WalletOutlined,
   StarOutlined, LogoutOutlined, UserOutlined, CoffeeOutlined,
   SunOutlined, MoonOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  DownOutlined,
+  DownOutlined, HomeOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { authStore } from '../store/authStore'
@@ -35,6 +35,8 @@ const chefMenuItems = [
   { key: '/kitchen', icon: <CoffeeOutlined />, label: '实时订单' },
   { key: '/dishes', icon: <ShopOutlined />, label: '菜品管理' },
   { key: '/menus', icon: <CalendarOutlined />, label: '菜单管理' },
+  { key: '/orders', icon: <UnorderedListOutlined />, label: '订单管理' },
+  { key: '/report', icon: <BarChartOutlined />, label: '消费报表' },
   { key: '/wish', icon: <StarOutlined />, label: '许愿活动' },
 ]
 
@@ -46,6 +48,7 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
   const user = authStore.getUser()
   const isAdmin = user?.role === 'admin'
   const menuItems = isAdmin ? adminMenuItems : chefMenuItems
+  const isDark = themeMode === 'dark'
 
   const currentPage = [...adminMenuItems, ...chefMenuItems].find(
     item => item.key === location.pathname
@@ -65,65 +68,105 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
     },
   }
 
-  const isDark = themeMode === 'dark'
+  // 侧边栏背景色
+  const siderBg = isDark ? '#141414' : '#ffffff'
+  const siderBorder = isDark ? '#2a2a2a' : '#EEF2F7'
 
   return (
     <Layout style={{ height: '100vh', overflow: 'hidden' }}>
-      {/* 侧边栏 */}
+      {/* ── 侧边栏 ── */}
       <Sider
         collapsed={collapsed}
         trigger={null}
         width={220}
         collapsedWidth={64}
         style={{
-          background: isDark ? '#141414' : '#fff',
-          borderRight: `1px solid ${token.colorBorderSecondary}`,
+          background: siderBg,
+          borderRight: `1px solid ${siderBorder}`,
           position: 'sticky',
           top: 0,
           height: '100vh',
           overflow: 'hidden',
           flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        {/* Logo */}
+        {/* Logo 区 */}
         <div style={{
-          height: 56,
+          height: 60,
           display: 'flex',
           alignItems: 'center',
-          padding: collapsed ? '0' : '0 20px',
+          padding: collapsed ? '0' : '0 16px',
           justifyContent: collapsed ? 'center' : 'flex-start',
           gap: 10,
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          borderBottom: `1px solid ${siderBorder}`,
           flexShrink: 0,
         }}>
           <div style={{
-            width: 30, height: 30,
-            borderRadius: 8,
-            background: token.colorPrimary,
+            width: 32, height: 32,
+            borderRadius: 9,
+            background: 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(22,119,255,0.35)',
           }}>
             <CoffeeOutlined style={{ color: '#fff', fontSize: 15 }} />
           </div>
           {!collapsed && (
-            <Text strong style={{ fontSize: 15, whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-              智能食堂
-            </Text>
+            <div>
+              <div style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: token.colorText,
+                lineHeight: 1.2,
+                letterSpacing: '-0.01em',
+                whiteSpace: 'nowrap',
+              }}>
+                智能食堂
+              </div>
+              <div style={{
+                fontSize: 11,
+                color: token.colorTextTertiary,
+                lineHeight: 1.4,
+                whiteSpace: 'nowrap',
+              }}>
+                管理控制台
+              </div>
+            </div>
           )}
         </div>
 
-        {/* 菜单 */}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingTop: 8, paddingBottom: 56 }}>
+        {/* 导航菜单 */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: '8px 0',
+          paddingBottom: 56,
+        }}>
+          {!collapsed && (
+            <div style={{
+              padding: '4px 20px 6px',
+              fontSize: 10.5,
+              fontWeight: 600,
+              color: token.colorTextQuaternary,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}>
+              {isAdmin ? '功能导航' : '操作台'}
+            </div>
+          )}
           <Menu
             mode="inline"
             selectedKeys={[location.pathname]}
             items={menuItems}
             onClick={({ key }) => navigate(key)}
-            style={{ border: 'none' }}
+            style={{ border: 'none', background: 'transparent' }}
           />
         </div>
 
-        {/* 折叠按钮 */}
+        {/* 收起按钮 */}
         <div
           onClick={() => setCollapsed(!collapsed)}
           style={{
@@ -134,12 +177,13 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            borderTop: `1px solid ${token.colorBorderSecondary}`,
+            borderTop: `1px solid ${siderBorder}`,
             color: token.colorTextTertiary,
-            fontSize: 13,
+            fontSize: 12,
             gap: 6,
             userSelect: 'none',
             transition: 'color 0.2s, background 0.2s',
+            background: siderBg,
           }}
           onMouseEnter={e => {
             e.currentTarget.style.color = token.colorPrimary
@@ -147,39 +191,47 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
           }}
           onMouseLeave={e => {
             e.currentTarget.style.color = token.colorTextTertiary
-            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.background = siderBg
           }}
         >
           {collapsed
             ? <MenuUnfoldOutlined style={{ fontSize: 14 }} />
-            : <><MenuFoldOutlined style={{ fontSize: 14 }} /><span>收起</span></>
+            : <><MenuFoldOutlined style={{ fontSize: 14 }} /><span style={{ fontWeight: 500 }}>收起</span></>
           }
         </div>
       </Sider>
 
+      {/* ── 右侧主区域 ── */}
       <Layout style={{
         background: token.colorBgLayout,
         overflow: 'auto',
         flex: 1,
       }}>
-        {/* 顶部栏 */}
+        {/* 顶部导航栏 */}
         <Header style={{
           background: token.colorBgContainer,
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          borderBottom: `1px solid ${isDark ? '#2a2a2a' : '#EEF2F7'}`,
           padding: '0 24px',
-          height: 56,
-          lineHeight: '56px',
+          height: 60,
+          lineHeight: '60px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           position: 'sticky',
           top: 0,
           zIndex: 10,
+          boxShadow: 'none',
         }}>
-          {/* 页面标题 */}
-          <Text strong style={{ fontSize: 15, color: token.colorTextHeading }}>
-            {currentPage?.label || '控制台'}
-          </Text>
+          {/* 左侧面包屑 + 页面标题 */}
+          <div>
+            <Breadcrumb
+              items={[
+                { href: '/', title: <HomeOutlined style={{ fontSize: 12 }} /> },
+                { title: <span style={{ fontSize: 12, color: token.colorText, fontWeight: 500 }}>{currentPage?.label || '控制台'}</span> },
+              ]}
+              style={{ lineHeight: 1, marginBottom: 2 }}
+            />
+          </div>
 
           {/* 右侧操作区 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -188,20 +240,26 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
                 type="text"
                 icon={themeMode === 'light' ? <MoonOutlined /> : <SunOutlined />}
                 onClick={onToggleTheme}
-                style={{ color: token.colorTextSecondary }}
+                style={{
+                  color: token.colorTextSecondary,
+                  borderRadius: 8,
+                }}
               />
             </Tooltip>
 
+            <div style={{ width: 1, height: 20, background: token.colorBorderSecondary, margin: '0 4px' }} />
+
             <Dropdown menu={userDropdown} placement="bottomRight">
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                cursor: 'pointer',
-                padding: '6px 12px 6px 8px',
-                borderRadius: 8,
-                transition: 'background 0.15s',
-              }}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  padding: '5px 10px 5px 6px',
+                  borderRadius: 8,
+                  transition: 'background 0.15s',
+                }}
                 onMouseEnter={e => (e.currentTarget.style.background = token.colorFillTertiary)}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
@@ -209,7 +267,7 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
                   size={28}
                   icon={<UserOutlined />}
                   src={user?.avatar || undefined}
-                  style={{ background: token.colorPrimary, flexShrink: 0 }}
+                  style={{ background: token.colorPrimary, flexShrink: 0, fontSize: 12 }}
                 />
                 <div style={{ lineHeight: 1.4 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: token.colorText, whiteSpace: 'nowrap' }}>
@@ -219,14 +277,14 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
                     {user?.role === 'admin' ? '管理员' : '厨师'}
                   </div>
                 </div>
-                <DownOutlined style={{ fontSize: 10, color: token.colorTextTertiary }} />
+                <DownOutlined style={{ fontSize: 10, color: token.colorTextQuaternary }} />
               </div>
             </Dropdown>
           </div>
         </Header>
 
         {/* 内容区 */}
-        <Content style={{ padding: 24 }}>
+        <Content style={{ padding: 24, minHeight: 0 }}>
           <Outlet />
         </Content>
       </Layout>

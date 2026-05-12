@@ -10,8 +10,8 @@ router.get('/my', authenticate, authorize('employee'), getMyOrders);
 // 厨师 + 管理员接口
 router.get('/', authenticate, authorize('chef', 'admin'), getAllOrders);
 
-// 管理员报表
-router.get('/report', authenticate, authorize('admin'), getReport);
+// 厨师 + 管理员报表
+router.get('/report', authenticate, authorize('chef', 'admin'), getReport);
 
 // 通用接口（权限在 controller 内判断）
 router.get('/:id', authenticate, getOrderById);

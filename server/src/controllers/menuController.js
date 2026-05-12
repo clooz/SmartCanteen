@@ -18,11 +18,11 @@ const getMenuByDate = async (req, res) => {
     const menu = menus[0];
     const [dishes] = await pool.query(
       `SELECT d.id, d.name, d.description, d.price, d.image_url, d.category,
-              md.stock, md.id AS menu_dish_id
+              md.stock, md.id AS menu_dish_id, md.meal_type
        FROM menu_dishes md
        JOIN dishes d ON md.dish_id = d.id
        WHERE md.menu_id = ?
-       ORDER BY d.category, d.id`,
+       ORDER BY md.meal_type, d.category, d.id`,
       [menu.id]
     );
 
@@ -42,19 +42,72 @@ const getTodayMenu = async (req, res) => {
 
 // 获取菜单列表（管理端用，分页）
 const getMenuList = async (req, res) => {
-  const { page = 1, page_size = 10 } = req.query;
+  const { page = 1, page_size = 10, status, menu_date, creator_keyword } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(page_size);
 
+  const where = ['1=1'];
+  const params = [];
+  if (status) {
+    where.push('dm.status = ?');
+    params.push(status);
+  }
+  if (menu_date) {
+    where.push('DATE(dm.menu_date) = ?');
+    params.push(menu_date);
+  }
+  if (creator_keyword) {
+    const kw = `%${String(creator_keyword).trim()}%`;
+    where.push('(u.nickname LIKE ? OR u.username LIKE ?)');
+    params.push(kw, kw);
+  }
+  const whereSql = where.join(' AND ');
+
   try {
-    const [[{ total }]] = await pool.query('SELECT COUNT(*) AS total FROM daily_menus');
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM daily_menus dm
+       LEFT JOIN users u ON dm.created_by = u.id
+       WHERE ${whereSql}`,
+      params
+    );
     const [rows] = await pool.query(
       `SELECT dm.*, u.nickname AS creator_name
        FROM daily_menus dm
        LEFT JOIN users u ON dm.created_by = u.id
+       WHERE ${whereSql}
        ORDER BY dm.menu_date DESC
        LIMIT ? OFFSET ?`,
-      [parseInt(page_size), offset]
+      [...params, parseInt(page_size), offset]
     );
+
+    if (rows.length > 0) {
+      const ids = rows.map((r) => r.id);
+      const placeholders = ids.map(() => '?').join(',');
+      const [mealSummaries] = await pool.query(
+        `SELECT md.menu_id,
+          GROUP_CONCAT(
+            CASE WHEN COALESCE(md.meal_type, 'lunch') = 'breakfast' THEN d.name END
+            ORDER BY d.category, d.id SEPARATOR '、'
+          ) AS breakfast_dishes,
+          GROUP_CONCAT(
+            CASE WHEN COALESCE(md.meal_type, 'lunch') = 'lunch' THEN d.name END
+            ORDER BY d.category, d.id SEPARATOR '、'
+          ) AS lunch_dishes
+         FROM menu_dishes md
+         JOIN dishes d ON md.dish_id = d.id
+         WHERE md.menu_id IN (${placeholders})
+         GROUP BY md.menu_id`,
+        ids
+      );
+      const byMenuId = Object.fromEntries(
+        mealSummaries.map((m) => [m.menu_id, m])
+      );
+      for (const row of rows) {
+        const s = byMenuId[row.id];
+        row.breakfast_dishes = s?.breakfast_dishes || '';
+        row.lunch_dishes = s?.lunch_dishes || '';
+      }
+    }
+
     return success(res, { total, page: parseInt(page), page_size: parseInt(page_size), list: rows });
   } catch (err) {
     console.error('getMenuList error:', err);
@@ -62,12 +115,39 @@ const getMenuList = async (req, res) => {
   }
 };
 
+function normalizeDishRows(arr) {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of arr) {
+    const dishId = typeof item === 'object' && item !== null ? Number(item.dish_id) : Number(item);
+    if (!dishId || Number.isNaN(dishId) || seen.has(dishId)) continue;
+    seen.add(dishId);
+    const stock = typeof item === 'object' && item !== null && item.stock != null ? item.stock : null;
+    out.push({ dish_id: dishId, stock });
+  }
+  return out;
+}
+
 // 创建或更新某日菜单（管理员）
 const createOrUpdateMenu = async (req, res) => {
-  const { menu_date, dish_ids, status } = req.body;
-  // dish_ids: [{ dish_id, stock }] 或 [dish_id, ...]
+  const { menu_date, dish_ids, breakfast_dish_ids, lunch_dish_ids, status } = req.body;
 
   if (!menu_date) return fail(res, '请提供菜单日期');
+
+  const hasMealPayload =
+    Object.prototype.hasOwnProperty.call(req.body, 'breakfast_dish_ids') ||
+    Object.prototype.hasOwnProperty.call(req.body, 'lunch_dish_ids');
+
+  let breakfastRows = null;
+  let lunchRows = null;
+  if (hasMealPayload) {
+    breakfastRows = normalizeDishRows(breakfast_dish_ids);
+    lunchRows = normalizeDishRows(lunch_dish_ids);
+  } else if (dish_ids && Array.isArray(dish_ids)) {
+    breakfastRows = [];
+    lunchRows = normalizeDishRows(dish_ids);
+  }
 
   const conn = await pool.getConnection();
   try {
@@ -93,15 +173,23 @@ const createOrUpdateMenu = async (req, res) => {
       menuId = result.insertId;
     }
 
-    // 更新菜品列表（先清空再插入）
-    if (dish_ids && Array.isArray(dish_ids)) {
+    // 更新菜品列表（先清空再插入，按餐次写入）
+    if (breakfastRows !== null && lunchRows !== null) {
+      if (breakfastRows.length + lunchRows.length === 0) {
+        await conn.rollback();
+        return fail(res, '请至少为早餐或午餐选择一道菜品');
+      }
       await conn.query('DELETE FROM menu_dishes WHERE menu_id = ?', [menuId]);
-      for (const item of dish_ids) {
-        const dishId = typeof item === 'object' ? item.dish_id : item;
-        const stock = typeof item === 'object' ? (item.stock || null) : null;
+      for (const row of breakfastRows) {
         await conn.query(
-          'INSERT IGNORE INTO menu_dishes (menu_id, dish_id, stock) VALUES (?, ?, ?)',
-          [menuId, dishId, stock]
+          'INSERT IGNORE INTO menu_dishes (menu_id, dish_id, meal_type, stock) VALUES (?, ?, ?, ?)',
+          [menuId, row.dish_id, 'breakfast', row.stock]
+        );
+      }
+      for (const row of lunchRows) {
+        await conn.query(
+          'INSERT IGNORE INTO menu_dishes (menu_id, dish_id, meal_type, stock) VALUES (?, ?, ?, ?)',
+          [menuId, row.dish_id, 'lunch', row.stock]
         );
       }
     }

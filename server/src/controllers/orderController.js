@@ -10,11 +10,17 @@ function generateOrderNo() {
 
 // 用户提交订单
 const createOrder = async (req, res) => {
-  const { items, remark } = req.body;
+  const { items, remark, meal_type: mealTypeBody } = req.body;
   // items: [{ dish_id, quantity }]
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return fail(res, '订单不能为空');
+  }
+
+  let mealType = mealTypeBody === 'breakfast' ? 'breakfast' : mealTypeBody === 'lunch' ? 'lunch' : null;
+  if (!mealType) {
+    const h = new Date().getHours();
+    mealType = h >= 6 && h < 11 ? 'breakfast' : 'lunch';
   }
 
   const conn = await pool.getConnection();
@@ -47,13 +53,13 @@ const createOrder = async (req, res) => {
         `SELECT d.id, d.name, d.price, md.stock
          FROM menu_dishes md
          JOIN dishes d ON md.dish_id = d.id
-         WHERE md.menu_id = ? AND d.id = ? AND d.is_available = 1`,
-        [menuId, item.dish_id]
+         WHERE md.menu_id = ? AND md.meal_type = ? AND d.id = ? AND d.is_available = 1`,
+        [menuId, mealType, item.dish_id]
       );
 
       if (dishRows.length === 0) {
         await conn.rollback();
-        return fail(res, `菜品 ID ${item.dish_id} 不在今日菜单中`);
+        return fail(res, `菜品 ID ${item.dish_id} 不在今日${mealType === 'breakfast' ? '早餐' : '午餐'}菜单中`);
       }
 
       const dish = dishRows[0];
@@ -78,8 +84,8 @@ const createOrder = async (req, res) => {
     // 创建订单
     const orderNo = generateOrderNo();
     const [orderResult] = await conn.query(
-      'INSERT INTO orders (order_no, user_id, menu_id, total_amount, remark) VALUES (?, ?, ?, ?, ?)',
-      [orderNo, req.user.id, menuId, totalAmount.toFixed(2), remark || '']
+      'INSERT INTO orders (order_no, user_id, menu_id, meal_type, total_amount, remark) VALUES (?, ?, ?, ?, ?, ?)',
+      [orderNo, req.user.id, menuId, mealType, totalAmount.toFixed(2), remark || '']
     );
     const orderId = orderResult.insertId;
 
@@ -92,8 +98,8 @@ const createOrder = async (req, res) => {
 
       // 扣减库存
       await conn.query(
-        'UPDATE menu_dishes SET stock = stock - ? WHERE menu_id = ? AND dish_id = ? AND stock IS NOT NULL',
-        [item.quantity, menuId, item.dish_id]
+        'UPDATE menu_dishes SET stock = stock - ? WHERE menu_id = ? AND dish_id = ? AND meal_type = ? AND stock IS NOT NULL',
+        [item.quantity, menuId, item.dish_id, mealType]
       );
     }
 
@@ -200,7 +206,10 @@ const getMyOrders = async (req, res) => {
 
 // 厨师/管理员查看所有订单
 const getAllOrders = async (req, res) => {
-  const { page = 1, page_size = 20, status, date, company_id } = req.query;
+  const {
+    page = 1, page_size = 20, status, date, company_id, keyword,
+    order_no, user_name, company_name,
+  } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(page_size);
 
   let where = ['1=1'];
@@ -209,12 +218,32 @@ const getAllOrders = async (req, res) => {
   if (status) { where.push('o.status = ?'); params.push(status); }
   if (date) { where.push('DATE(o.created_at) = ?'); params.push(date); }
   if (company_id) { where.push('u.company_id = ?'); params.push(company_id); }
+  if (keyword) {
+    const kw = `%${String(keyword).trim()}%`;
+    where.push('(o.order_no LIKE ? OR u.nickname LIKE ? OR c.name LIKE ?)');
+    params.push(kw, kw, kw);
+  }
+  if (order_no) {
+    where.push('o.order_no LIKE ?');
+    params.push(`%${String(order_no).trim()}%`);
+  }
+  if (user_name) {
+    where.push('u.nickname LIKE ?');
+    params.push(`%${String(user_name).trim()}%`);
+  }
+  if (company_name) {
+    where.push('c.name LIKE ?');
+    params.push(`%${String(company_name).trim()}%`);
+  }
 
   const whereSql = where.join(' AND ');
 
   try {
     const [[{ total }]] = await pool.query(
-      `SELECT COUNT(*) AS total FROM orders o JOIN users u ON o.user_id = u.id WHERE ${whereSql}`,
+      `SELECT COUNT(*) AS total FROM orders o
+       JOIN users u ON o.user_id = u.id
+       LEFT JOIN companies c ON u.company_id = c.id
+       WHERE ${whereSql}`,
       params
     );
     const [rows] = await pool.query(

@@ -1,29 +1,38 @@
 import { useEffect, useState, useRef } from 'react'
-import { Card, Badge, Button, Tag, Empty, Typography, Space, Row, Col, Divider, message } from 'antd'
-import { CheckOutlined, ClockCircleOutlined, BellOutlined } from '@ant-design/icons'
+import { Card, Badge, Button, Tag, Empty, Typography, Space, Divider, message, theme } from 'antd'
+import { CheckOutlined, ClockCircleOutlined, BellOutlined, ReloadOutlined } from '@ant-design/icons'
+import PageListShell from '../../components/PageListShell'
 import { io, Socket } from 'socket.io-client'
 import { ordersApi } from '../../api/orders'
 import dayjs from 'dayjs'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending: { label: '待接单', color: 'gold' },
-  confirmed: { label: '制作中', color: 'blue' },
-  ready: { label: '可取餐', color: 'green' },
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  pending: { label: '待接单', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+  confirmed: { label: '制作中', color: '#1677ff', bg: '#eff6ff', border: '#bfdbfe' },
+  ready: { label: '可取餐', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
 }
+
+const COLUMN_CONFIG = [
+  { status: 'pending', title: '待接单', dotColor: '#f59e0b', headerBg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', accentColor: '#d97706' },
+  { status: 'confirmed', title: '制作中', dotColor: '#1677ff', headerBg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', accentColor: '#1677ff' },
+  { status: 'ready', title: '可取餐', dotColor: '#22c55e', headerBg: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', accentColor: '#16a34a' },
+]
 
 interface OrderItem { dish_name: string; quantity: number; subtotal: number }
 interface Order {
   id: number; order_no: string; user_name: string; company_name: string
   total_amount: string; status: string; remark: string
   created_at: string; items: OrderItem[]
+  meal_type?: string
 }
 
 export default function KitchenPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
   const socketRef = useRef<Socket | null>(null)
+  const { token } = theme.useToken()
 
   const fetchOrders = async () => {
     setLoading(true)
@@ -74,97 +83,216 @@ export default function KitchenPage() {
     } catch { /* 统一处理 */ }
   }
 
-  const pendingOrders = orders.filter(o => o.status === 'pending')
-  const confirmedOrders = orders.filter(o => o.status === 'confirmed')
-  const readyOrders = orders.filter(o => o.status === 'ready')
-
-  const renderOrderCard = (order: Order) => (
-    <Card
-      key={order.id}
-      size="small"
-      style={{ marginBottom: 12 }}
-      title={
-        <Space>
-          <Tag color={STATUS_MAP[order.status]?.color}>{STATUS_MAP[order.status]?.label}</Tag>
-          <Text strong style={{ fontSize: 12 }}>{order.order_no}</Text>
-        </Space>
-      }
-      extra={
-        <Space>
-          {order.status === 'pending' && (
-            <Button type="primary" size="small" icon={<CheckOutlined />}
-              onClick={() => updateStatus(order.id, 'confirmed')}>接单</Button>
-          )}
-          {order.status === 'confirmed' && (
-            <Button type="primary" size="small" style={{ background: '#52c41a', borderColor: '#52c41a' }}
-              onClick={() => updateStatus(order.id, 'ready')}>出餐</Button>
-          )}
-          {order.status === 'ready' && (
-            <Button size="small" onClick={() => updateStatus(order.id, 'done')}>完成</Button>
-          )}
-        </Space>
-      }
-    >
-      <Space direction="vertical" style={{ width: '100%' }} size={4}>
-        <Text><Text strong>{order.user_name}</Text> · {order.company_name}</Text>
-        <Divider style={{ margin: '6px 0' }} />
-        {order.items?.map((item, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Text>{item.dish_name} × {item.quantity}</Text>
-            <Text type="secondary">¥{item.subtotal}</Text>
-          </div>
-        ))}
-        <Divider style={{ margin: '6px 0' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <Text type="secondary">合计</Text>
-          <Text strong style={{ color: '#f5a623' }}>¥{order.total_amount}</Text>
-        </div>
-        {order.remark && <Text type="secondary" style={{ fontSize: 12 }}>备注：{order.remark}</Text>}
-        <Text type="secondary" style={{ fontSize: 11 }}>
-          <ClockCircleOutlined /> {dayjs(order.created_at).format('HH:mm:ss')}
-        </Text>
-      </Space>
-    </Card>
-  )
-
-  const KanbanColumn = ({ title, color, count, children }: any) => (
-    <Col span={8}>
-      <Card
-        title={
-          <Space>
-            <Badge color={color} />
-            <Text strong>{title}</Text>
-            <Badge count={count} color={color} />
-          </Space>
-        }
-        style={{ minHeight: 400 }}
-        loading={loading}
+  const renderOrderCard = (order: Order) => {
+    const s = STATUS_MAP[order.status]
+    return (
+      <div
+        key={order.id}
+        style={{
+          background: '#fff',
+          borderRadius: 10,
+          border: `1px solid ${token.colorBorderSecondary}`,
+          marginBottom: 10,
+          overflow: 'hidden',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          transition: 'box-shadow 0.2s ease',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)')}
+        onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)')}
       >
-        {children.length === 0
-          ? <Empty description="暂无订单" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-          : children
-        }
-      </Card>
-    </Col>
-  )
+        {/* 卡片头部 */}
+        <div style={{
+          padding: '10px 14px',
+          borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: '#FAFBFC',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Tag style={{
+              background: s?.bg,
+              color: s?.color,
+              border: `1px solid ${s?.border}`,
+              borderRadius: 5,
+              fontSize: 11,
+              padding: '0 6px',
+              margin: 0,
+              fontWeight: 600,
+            }}>
+              {s?.label}
+            </Tag>
+            <Text style={{ fontSize: 12, color: token.colorTextTertiary, fontFamily: 'monospace' }}>
+              #{order.order_no.slice(-6)}
+            </Text>
+            <Tag color={order.meal_type === 'breakfast' ? 'gold' : 'blue'} style={{ margin: 0 }}>
+              {order.meal_type === 'breakfast' ? '早餐' : '午餐'}
+            </Tag>
+          </div>
+          <Space size={6}>
+            {order.status === 'pending' && (
+              <Button
+                type="primary"
+                size="small"
+                icon={<CheckOutlined />}
+                onClick={() => updateStatus(order.id, 'confirmed')}
+                style={{ fontSize: 12, height: 26, borderRadius: 6 }}
+              >
+                接单
+              </Button>
+            )}
+            {order.status === 'confirmed' && (
+              <Button
+                size="small"
+                onClick={() => updateStatus(order.id, 'ready')}
+                style={{
+                  fontSize: 12,
+                  height: 26,
+                  borderRadius: 6,
+                  background: '#16a34a',
+                  borderColor: '#16a34a',
+                  color: '#fff',
+                }}
+              >
+                出餐
+              </Button>
+            )}
+            {order.status === 'ready' && (
+              <Button
+                size="small"
+                onClick={() => updateStatus(order.id, 'done')}
+                style={{ fontSize: 12, height: 26, borderRadius: 6 }}
+              >
+                完成
+              </Button>
+            )}
+          </Space>
+        </div>
+
+        {/* 卡片内容 */}
+        <div style={{ padding: '10px 14px' }}>
+          <div style={{ marginBottom: 8 }}>
+            <Text strong style={{ fontSize: 13, color: token.colorText }}>{order.user_name}</Text>
+            <Text style={{ fontSize: 12, color: token.colorTextTertiary }}> · {order.company_name}</Text>
+          </div>
+
+          <Divider style={{ margin: '8px 0', borderColor: token.colorBorderSecondary }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+            {order.items?.map((item, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: token.colorText }}>
+                  {item.dish_name}
+                  <span style={{ color: token.colorTextTertiary, fontSize: 12 }}> × {item.quantity}</span>
+                </Text>
+                <Text style={{ fontSize: 12, color: token.colorTextSecondary }}>¥{item.subtotal}</Text>
+              </div>
+            ))}
+          </div>
+
+          <Divider style={{ margin: '8px 0', borderColor: token.colorBorderSecondary }} />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 12, color: token.colorTextTertiary }}>
+              <ClockCircleOutlined style={{ marginRight: 4 }} />
+              {dayjs(order.created_at).format('HH:mm:ss')}
+            </Text>
+            <Text strong style={{ fontSize: 14, color: '#d97706' }}>¥{order.total_amount}</Text>
+          </div>
+
+          {order.remark && (
+            <div style={{
+              marginTop: 8,
+              padding: '5px 8px',
+              background: '#FFFBEB',
+              borderRadius: 5,
+              border: '1px solid #FDE68A',
+            }}>
+              <Text style={{ fontSize: 11.5, color: '#92400E' }}>备注：{order.remark}</Text>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const groupedOrders = {
+    pending: orders.filter(o => o.status === 'pending'),
+    confirmed: orders.filter(o => o.status === 'confirmed'),
+    ready: orders.filter(o => o.status === 'ready'),
+  }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>实时订单</Title>
-        <Button onClick={fetchOrders}>刷新</Button>
+    <PageListShell
+      variant="plain"
+      title="实时订单"
+      subtitle={`共 ${orders.length} 个进行中的订单`}
+      headerExtra={
+        <Button icon={<ReloadOutlined />} onClick={fetchOrders} loading={loading}>
+          刷新
+        </Button>
+      }
+    >
+      {/* 看板列 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        {COLUMN_CONFIG.map(col => {
+          const colOrders = groupedOrders[col.status as keyof typeof groupedOrders]
+          return (
+            <div key={col.status}>
+              {/* 列头 */}
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '10px 10px 0 0',
+                background: col.headerBg,
+                border: `1px solid ${token.colorBorderSecondary}`,
+                borderBottom: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Badge color={col.dotColor} />
+                  <Text strong style={{ fontSize: 14, color: '#0F172A' }}>{col.title}</Text>
+                </div>
+                <div style={{
+                  background: col.accentColor,
+                  color: '#fff',
+                  borderRadius: 20,
+                  padding: '2px 10px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  minWidth: 28,
+                  textAlign: 'center',
+                }}>
+                  {colOrders.length}
+                </div>
+              </div>
+
+              {/* 列内容 */}
+              <div style={{
+                minHeight: 400,
+                padding: 12,
+                background: '#F8FAFC',
+                borderRadius: '0 0 10px 10px',
+                border: `1px solid ${token.colorBorderSecondary}`,
+                borderTop: 'none',
+              }}>
+                {loading && colOrders.length === 0 ? (
+                  <Card loading style={{ borderRadius: 8 }} />
+                ) : colOrders.length === 0 ? (
+                  <Empty
+                    description={<span style={{ fontSize: 13, color: '#94A3B8' }}>暂无订单</span>}
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    style={{ marginTop: 60 }}
+                  />
+                ) : (
+                  colOrders.map(renderOrderCard)
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
-      <Row gutter={16}>
-        <KanbanColumn title="待接单" color="gold" count={pendingOrders.length}>
-          {pendingOrders.map(renderOrderCard)}
-        </KanbanColumn>
-        <KanbanColumn title="制作中" color="blue" count={confirmedOrders.length}>
-          {confirmedOrders.map(renderOrderCard)}
-        </KanbanColumn>
-        <KanbanColumn title="可取餐" color="green" count={readyOrders.length}>
-          {readyOrders.map(renderOrderCard)}
-        </KanbanColumn>
-      </Row>
-    </div>
+    </PageListShell>
   )
 }

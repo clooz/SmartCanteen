@@ -1,0 +1,52 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/index/index",
+    "pages/wish/wish",
+    "pages/wish-detail/wish-detail",
+    "pages/recharge/recharge",
+    "pages/recharge-records/recharge-records",
+    "pages/profile/profile"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#0891B2",
+    "navigationBarTitleText": "智慧食堂",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F0FDFF",
+    "enablePullDownRefresh": false
+  },
+  "tabBar": {
+    "color": "#94A3B8",
+    "selectedColor": "#0891B2",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "今日菜单"
+      },
+      {
+        "pagePath": "pages/wish/wish",
+        "text": "许愿"
+      },
+      {
+        "pagePath": "pages/recharge/recharge",
+        "text": "充值"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的"
+      }
+    ]
+  },
+  "usingComponents": {
+    "van-icon": "@vant/weapp/icon/index",
+    "van-loading": "@vant/weapp/loading/index",
+    "van-popup": "@vant/weapp/popup/index",
+    "van-sticky": "@vant/weapp/sticky/index"
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

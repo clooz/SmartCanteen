@@ -1,0 +1,101 @@
+<view class="page">
+  <!-- 用户信息卡片 -->
+  <view class="user-card">
+    <view class="user-avatar">{{avatarText}}</view>
+    <view class="user-info">
+      <view class="user-name">{{userInfo.nickname || userInfo.username || '用户'}}</view>
+      <view class="user-meta">
+        <text class="user-company">{{userInfo.company_name || '未绑定公司'}}</text>
+        <text class="user-dot">·</text>
+        <text class="user-role">员工</text>
+      </view>
+    </view>
+    <view class="user-edit" bindtap="goEditNickname">
+      <van-icon name="edit" size="40rpx" color="rgba(255,255,255,0.8)" />
+    </view>
+  </view>
+
+  <!-- 功能入口列表 -->
+  <view class="menu-group">
+    <view class="group-title">我的记录</view>
+    <view class="menu-card">
+      <view class="menu-item" bindtap="goRechargeRecords">
+        <view class="menu-icon recharge">💳</view>
+        <view class="menu-label">充值记录</view>
+        <view class="menu-arrow">›</view>
+      </view>
+      <view class="menu-divider"></view>
+      <!-- 订餐 - 即将开放 -->
+      <view class="menu-item disabled">
+        <view class="menu-icon order">🍱</view>
+        <view class="menu-label">我的订单</view>
+        <view class="menu-badge">即将开放</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="menu-group">
+    <view class="group-title">账号设置</view>
+    <view class="menu-card">
+      <view class="menu-item" bindtap="goEditNickname">
+        <view class="menu-icon nickname">✏️</view>
+        <view class="menu-label">修改昵称</view>
+        <view class="menu-arrow">›</view>
+      </view>
+      <view class="menu-divider"></view>
+      <view class="menu-item" bindtap="goChangePassword">
+        <view class="menu-icon password">🔒</view>
+        <view class="menu-label">修改密码</view>
+        <view class="menu-arrow">›</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="logout-wrap">
+    <view class="btn-logout" bindtap="onLogout">退出登录</view>
+  </view>
+
+  <view class="version-text">智慧食堂 v1.0</view>
+
+  <!-- 修改昵称弹窗 -->
+  <van-popup show="{{showNicknameSheet}}" position="bottom" round bind:close="hideNicknameSheet">
+    <view class="sheet-header">
+      <view class="sheet-cancel" bindtap="hideNicknameSheet">取消</view>
+      <view class="sheet-title">修改昵称</view>
+      <view class="sheet-confirm {{newNickname ? 'active' : ''}}" bindtap="saveNickname">保存</view>
+    </view>
+    <view class="sheet-body">
+      <input
+        class="nickname-input"
+        placeholder="请输入新昵称"
+        value="{{newNickname}}"
+        bindinput="onNicknameInput"
+        maxlength="20"
+        focus="{{showNicknameSheet}}"
+      />
+    </view>
+  </van-popup>
+
+  <!-- 修改密码弹窗 -->
+  <van-popup show="{{showPasswordSheet}}" position="bottom" round bind:close="hidePasswordSheet">
+    <view class="sheet-header">
+      <view class="sheet-cancel" bindtap="hidePasswordSheet">取消</view>
+      <view class="sheet-title">修改密码</view>
+      <view class="sheet-confirm active" bindtap="savePassword">保存</view>
+    </view>
+    <view class="sheet-body">
+      <view class="pwd-field">
+        <text class="pwd-label">当前密码</text>
+        <input class="pwd-input" password placeholder="请输入当前密码" value="{{oldPwd}}" bindinput="onPwdInput" data-key="oldPwd" />
+      </view>
+      <view class="pwd-field">
+        <text class="pwd-label">新密码</text>
+        <input class="pwd-input" password placeholder="至少6位" value="{{newPwd}}" bindinput="onPwdInput" data-key="newPwd" />
+      </view>
+      <view class="pwd-field">
+        <text class="pwd-label">确认密码</text>
+        <input class="pwd-input" password placeholder="再次输入新密码" value="{{confirmPwd}}" bindinput="onPwdInput" data-key="confirmPwd" />
+      </view>
+    </view>
+  </van-popup>
+</view>

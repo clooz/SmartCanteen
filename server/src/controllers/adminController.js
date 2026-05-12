@@ -2,9 +2,110 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../db/connection');
 const { success, fail } = require('../utils/response');
 
+/**
+ * 批量同步/导入用户（外部工作平台对接入口）
+ *
+ * POST /admin/users/sync
+ * Body: {
+ *   source: 'dingtalk' | 'wecom' | 'feishu' | 'hr' | string,  // 来源标识
+ *   users: [{
+ *     ext_uid:      string,   // 外部平台唯一ID（首选匹配键）
+ *     username:     string,   // 本系统用户名/手机号（ext_uid 缺失时匹配用）
+ *     nickname:     string,   // 姓名/昵称
+ *     company_code: string,   // 公司编码，如 A/B/C/D（可选）
+ *     role:         'employee'|'chef'|'admin',  // 默认 employee
+ *     is_active:    0|1,      // 默认 1
+ *   }]
+ * }
+ * Response: { created, updated, skipped, errors[] }
+ *
+ * 对接说明：
+ *   外部平台在人员变更后调用此接口即可自动更新餐厅系统用户，
+ *   无需手工维护。新用户默认密码为 "123456"，建议首次登录修改。
+ *   同一 ext_uid 多次同步只会 UPDATE，不会重复创建。
+ */
+const syncUsers = async (req, res) => {
+  const { source, users } = req.body;
+  if (!source) return fail(res, '请提供 source 来源标识');
+  if (!Array.isArray(users) || users.length === 0) return fail(res, 'users 不能为空');
+
+  // 预加载公司编码→ID映射
+  const [companies] = await pool.query('SELECT id, code FROM companies');
+  const codeToId = Object.fromEntries(companies.map((c) => [c.code.toUpperCase(), c.id]));
+
+  let created = 0, updated = 0, skipped = 0;
+  const errors = [];
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+  for (const u of users) {
+    const { ext_uid, username, nickname, company_code, role = 'employee', is_active = 1 } = u;
+
+    if (!ext_uid && !username) {
+      errors.push({ raw: u, reason: 'ext_uid 和 username 均为空，跳过' });
+      skipped++;
+      continue;
+    }
+    if (!['employee', 'chef', 'admin'].includes(role)) {
+      errors.push({ raw: u, reason: `无效的角色值 "${role}"` });
+      skipped++;
+      continue;
+    }
+
+    const company_id = company_code ? (codeToId[String(company_code).toUpperCase()] ?? null) : null;
+
+    try {
+      // 优先按 ext_uid 查，再按 username 查
+      let existing = null;
+      if (ext_uid) {
+        const [rows] = await pool.query('SELECT id FROM users WHERE ext_uid = ?', [ext_uid]);
+        if (rows.length) existing = rows[0];
+      }
+      if (!existing && username) {
+        const [rows] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+        if (rows.length) existing = rows[0];
+      }
+
+      if (existing) {
+        // 更新已有用户（不覆盖密码）
+        await pool.query(
+          `UPDATE users SET
+             nickname    = COALESCE(NULLIF(?, ''), nickname),
+             company_id  = COALESCE(?, company_id),
+             role        = ?,
+             is_active   = ?,
+             ext_uid     = COALESCE(ext_uid, ?),
+             sync_source = ?,
+             synced_at   = ?
+           WHERE id = ?`,
+          [nickname || '', company_id, role, is_active,
+           ext_uid || null, source, now, existing.id]
+        );
+        updated++;
+      } else {
+        // 新建用户，默认密码 123456
+        const defaultPwd = await bcrypt.hash('123456', 10);
+        const finalUsername = username || `sync_${source}_${ext_uid}`;
+        await pool.query(
+          `INSERT INTO users (username, password, nickname, role, company_id, is_active, ext_uid, sync_source, synced_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [finalUsername, defaultPwd, nickname || finalUsername,
+           role, company_id, is_active, ext_uid || null, source, now]
+        );
+        created++;
+      }
+    } catch (e) {
+      errors.push({ raw: u, reason: e.message });
+      skipped++;
+    }
+  }
+
+  return success(res, { created, updated, skipped, errors },
+    `同步完成：新增 ${created}，更新 ${updated}，跳过 ${skipped}`);
+};
+
 // 获取用户列表
 const getUsers = async (req, res) => {
-  const { role, company_id, keyword, page = 1, page_size = 20 } = req.query;
+  const { role, company_id, keyword, page = 1, page_size = 20, is_active, username, nickname } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(page_size);
 
   let where = ['1=1'];
@@ -12,6 +113,12 @@ const getUsers = async (req, res) => {
   if (role) { where.push('u.role = ?'); params.push(role); }
   if (company_id) { where.push('u.company_id = ?'); params.push(company_id); }
   if (keyword) { where.push('(u.username LIKE ? OR u.nickname LIKE ?)'); params.push(`%${keyword}%`, `%${keyword}%`); }
+  if (username) { where.push('u.username LIKE ?'); params.push(`%${String(username).trim()}%`); }
+  if (nickname) { where.push('u.nickname LIKE ?'); params.push(`%${String(nickname).trim()}%`); }
+  if (is_active !== undefined && is_active !== '' && is_active !== null) {
+    where.push('u.is_active = ?');
+    params.push(parseInt(is_active, 10));
+  }
 
   const whereSql = where.join(' AND ');
 
@@ -21,7 +128,8 @@ const getUsers = async (req, res) => {
       params
     );
     const [rows] = await pool.query(
-      `SELECT u.id, u.username, u.nickname, u.avatar, u.role, u.company_id, u.is_active, u.created_at,
+      `SELECT u.id, u.username, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
+              u.ext_uid, u.sync_source, u.synced_at, u.created_at,
               c.name AS company_name, c.code AS company_code
        FROM users u
        LEFT JOIN companies c ON u.company_id = c.id
@@ -163,4 +271,4 @@ const updateCompany = async (req, res) => {
   }
 };
 
-module.exports = { getUsers, createUser, updateUser, resetUserPassword, getCompanies, createCompany, updateCompany };
+module.exports = { syncUsers, getUsers, createUser, updateUser, resetUserPassword, getCompanies, createCompany, updateCompany };
