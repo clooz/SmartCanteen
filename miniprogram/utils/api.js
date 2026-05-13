@@ -1,7 +1,7 @@
 const { getToken, clearAuth } = require('./storage')
 
-// 与 BASE_URL 同源；手机真机请填电脑局域网 IP，勿用 localhost（手机上的 localhost 是手机自己）
-const BASE_URL = 'http://172.16.0.151:3000/api'
+// 与 BASE_URL 同源；填本机 ipconfig 的 IPv4（换 WiFi 后常会变）；真机勿用 localhost
+const BASE_URL = 'http://172.16.0.26:3000/api'
 const ASSET_ORIGIN = BASE_URL.replace(/\/?api\/?$/i, '').replace(/\/+$/, '') || 'http://127.0.0.1:3000'
 
 /** 把后端返回的相对路径或 localhost 绝对路径转成真机可访问的完整 URL（供 <image> / 预览图） */
@@ -62,24 +62,49 @@ function upload(path, filePath, formData = {}) {
     const header = {}
     if (token) header['Authorization'] = `Bearer ${token}`
 
+    // wx.uploadFile 的 formData 键值需为 string（与后端 multer 字段名一致）
+    const stringForm = {}
+    Object.keys(formData || {}).forEach((k) => {
+      const v = formData[k]
+      if (v !== undefined && v !== null) stringForm[k] = String(v)
+    })
+
     wx.uploadFile({
       url: `${BASE_URL}${path}`,
       filePath,
-      name: 'image',
-      formData,
+      // 须与 server/src/routes/recharge.js 中 upload.single('proof_image') 一致
+      name: 'proof_image',
+      formData: stringForm,
       header,
       success(res) {
+        const statusCode = res.statusCode || 0
+        let data
         try {
-          const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
-          if (data.success === false) {
-            wx.showToast({ title: data.message || '上传失败', icon: 'none' })
-            reject(new Error(data.message))
-          } else {
-            resolve(data)
-          }
+          data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
         } catch {
+          wx.showToast({ title: '上传响应解析失败', icon: 'none' })
           reject(new Error('上传响应解析失败'))
+          return
         }
+        if (statusCode === 401) {
+          clearAuth()
+          wx.reLaunch({ url: '/pages/login/login' })
+          reject(new Error('未登录或登录已过期'))
+          return
+        }
+        if (statusCode < 200 || statusCode >= 300) {
+          const msg = data?.message || `请求失败(${statusCode})`
+          wx.showToast({ title: msg, icon: 'none', duration: 2000 })
+          reject(new Error(msg))
+          return
+        }
+        // 后端统一 { code: 0 成功, code: 1 失败 }
+        if (data.code !== 0) {
+          wx.showToast({ title: data.message || '上传失败', icon: 'none', duration: 2000 })
+          reject(new Error(data.message || '上传失败'))
+          return
+        }
+        resolve(data)
       },
       fail(err) {
         wx.showToast({ title: '上传失败，请重试', icon: 'none' })

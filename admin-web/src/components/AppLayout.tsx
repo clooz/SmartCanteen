@@ -5,7 +5,7 @@ import {
   BarChartOutlined, TeamOutlined, BankOutlined, WalletOutlined,
   StarOutlined, LogoutOutlined, UserOutlined, CoffeeOutlined,
   SunOutlined, MoonOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  DownOutlined, HomeOutlined,
+  DownOutlined, HomeOutlined, ControlOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { authStore } from '../store/authStore'
@@ -111,7 +111,7 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
             flexShrink: 0,
             boxShadow: '0 2px 8px rgba(22,119,255,0.35)',
           }}>
-            <CoffeeOutlined style={{ color: '#fff', fontSize: 15 }} />
+            <ControlOutlined style={{ color: '#fff', fontSize: 15 }} />
           </div>
           {!collapsed && (
             <div>

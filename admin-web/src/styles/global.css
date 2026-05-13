@@ -57,16 +57,17 @@ html, body, #root {
   font-weight: 500 !important;
   letter-spacing: 0.01em;
 }
-/* 主按钮：禁用态勿用 !important 盖住，否则穿梭框等组件的禁用按钮仍显示全蓝 */
-.ant-btn-primary:not(:disabled):not(.ant-btn-disabled) {
+/* 主按钮：禁用态勿用 !important 盖住，否则穿梭框等组件的禁用按钮仍显示全蓝。
+   排除 ant-btn-background-ghost，否则 ghost 主按钮被铺成实色蓝、文字仍为主色蓝导致「看不见字」 */
+.ant-btn-primary:not(:disabled):not(.ant-btn-disabled):not(.ant-btn-background-ghost) {
   background: #1677ff !important;
 }
-.ant-btn-primary:not(:disabled):not(.ant-btn-disabled):hover {
+.ant-btn-primary:not(:disabled):not(.ant-btn-disabled):not(.ant-btn-background-ghost):hover {
   background: #4096ff !important;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(22,119,255,0.30) !important;
 }
-.ant-btn-primary:not(:disabled):not(.ant-btn-disabled):active {
+.ant-btn-primary:not(:disabled):not(.ant-btn-disabled):not(.ant-btn-background-ghost):active {
   transform: translateY(0);
   background: #0958d9 !important;
 }

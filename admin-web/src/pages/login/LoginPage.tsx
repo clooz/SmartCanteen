@@ -1,5 +1,5 @@
 import { Form, Input, Button, Typography } from 'antd'
-import { UserOutlined, LockOutlined, CoffeeOutlined } from '@ant-design/icons'
+import { UserOutlined, LockOutlined, ControlOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { authApi } from '../../api/auth'
 import { authStore } from '../../store/authStore'
@@ -27,7 +27,7 @@ export default function LoginPage() {
       <div className="login-card">
         <div className="login-card__header">
           <div className="login-card__logo">
-            <CoffeeOutlined />
+            <ControlOutlined />
           </div>
           <h1>登录 智能食堂</h1>
           <Text>欢迎使用管理系统</Text>

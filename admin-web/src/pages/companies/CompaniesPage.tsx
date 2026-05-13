@@ -164,7 +164,7 @@ export default function CompaniesPage() {
         />
       </PageListShell>
 
-      <Modal title={editingId ? '编辑公司' : '新增公司'} open={modalOpen}
+      <Modal title={editingId ? '编辑公司' : '新增公司'} open={modalOpen} destroyOnClose
         onOk={handleSubmit} onCancel={() => setModalOpen(false)} okText="保存">
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="公司名称" rules={[{ required: true }]}>

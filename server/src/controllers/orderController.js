@@ -1,5 +1,7 @@
 const { pool } = require('../db/connection');
 const { success, fail } = require('../utils/response');
+const { getKitchenOrderingSettings } = require('../services/kitchenOrderingSettings');
+const { evaluateMealOrdering, localDateStr } = require('../utils/orderingRules');
 
 // 生成订单号：日期 + 6位随机数
 function generateOrderNo() {
@@ -28,16 +30,25 @@ const createOrder = async (req, res) => {
     await conn.beginTransaction();
 
     // 查询今日已发布的菜单
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateStr();
     const [menus] = await conn.query(
-      "SELECT id FROM daily_menus WHERE menu_date = ? AND status = 'published'",
+      "SELECT * FROM daily_menus WHERE menu_date = ? AND status = 'published'",
       [today]
     );
     if (menus.length === 0) {
       await conn.rollback();
       return fail(res, '今日菜单尚未发布，暂时无法下单');
     }
-    const menuId = menus[0].id;
+    const menuRow = menus[0];
+
+    const settings = await getKitchenOrderingSettings(conn);
+    const ordCheck = evaluateMealOrdering(menuRow, settings, mealType, new Date());
+    if (!ordCheck.accepting) {
+      await conn.rollback();
+      return fail(res, ordCheck.reasonText || '当前不可订餐');
+    }
+
+    const menuId = menuRow.id;
 
     // 验证所有菜品是否在今日菜单中，并获取价格
     let totalAmount = 0;

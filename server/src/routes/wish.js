@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getActivities, createActivity, closeActivity,
+  getActivities, createActivity, updateActivity, closeActivity, reopenActivity,
   getWishItems, createWishItem, voteWishItem, unvoteWishItem, adoptWishItem,
   getComments, createComment, deleteComment
 } = require('../controllers/wishController');
@@ -14,6 +14,8 @@ router.get('/activities/:activity_id/items', authenticate, getWishItems);
 // 管理员/厨师管理活动
 router.post('/activities', authenticate, authorize('admin', 'chef'), createActivity);
 router.put('/activities/:id/close', authenticate, authorize('admin', 'chef'), closeActivity);
+router.put('/activities/:id/reopen', authenticate, authorize('admin', 'chef'), reopenActivity);
+router.put('/activities/:id', authenticate, authorize('admin', 'chef'), updateActivity);
 
 // 员工提交许愿
 router.post('/activities/:activity_id/items', authenticate, authorize('employee'), createWishItem);

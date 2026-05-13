@@ -139,7 +139,11 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={
-              <PrivateRoute roles={['admin', 'chef']}>
+              <PrivateRoute
+                roles={['admin', 'chef']}
+                deniedRedirect="/login"
+                clearOnDenied
+              >
                 <AppLayout themeMode={themeMode} onToggleTheme={toggleTheme} />
               </PrivateRoute>
             }>

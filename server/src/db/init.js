@@ -41,11 +41,27 @@ const CREATE_TABLES = [
     UNIQUE KEY uk_dish_name (name)
   ) COMMENT='菜品表'`,
 
+  // 全厨房统一默认订餐时段（单行 id=1）
+  `CREATE TABLE IF NOT EXISTS kitchen_ordering_settings (
+    id INT PRIMARY KEY DEFAULT 1,
+    breakfast_order_start TIME NOT NULL DEFAULT '06:30:00' COMMENT '默认早餐订餐开始',
+    breakfast_order_end TIME NOT NULL DEFAULT '09:30:00' COMMENT '默认早餐订餐结束',
+    lunch_order_start TIME NOT NULL DEFAULT '10:00:00' COMMENT '默认午餐订餐开始',
+    lunch_order_end TIME NOT NULL DEFAULT '13:30:00' COMMENT '默认午餐订餐结束',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) COMMENT='全厨房统一默认订餐时段'`,
+
   // 每日菜单表
   `CREATE TABLE IF NOT EXISTS daily_menus (
     id INT AUTO_INCREMENT PRIMARY KEY,
     menu_date DATE NOT NULL UNIQUE COMMENT '菜单日期',
     status ENUM('draft', 'published', 'closed') DEFAULT 'draft' COMMENT '草稿/已发布/已关闭',
+    breakfast_order_start TIME DEFAULT NULL COMMENT '按日覆盖早餐开始，NULL=用全局',
+    breakfast_order_end TIME DEFAULT NULL COMMENT '按日覆盖早餐结束',
+    lunch_order_start TIME DEFAULT NULL COMMENT '按日覆盖午餐开始',
+    lunch_order_end TIME DEFAULT NULL COMMENT '按日覆盖午餐结束',
+    breakfast_ordering_override ENUM('auto', 'open', 'closed') NOT NULL DEFAULT 'auto' COMMENT '早餐：自动/强制开/强制关',
+    lunch_ordering_override ENUM('auto', 'open', 'closed') NOT NULL DEFAULT 'auto' COMMENT '午餐：自动/强制开/强制关',
     created_by INT DEFAULT NULL COMMENT '创建人ID',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -252,6 +268,52 @@ async function migrateSchema() {
   }
 }
 
+async function migrateOrderingWindow() {
+  const [tables] = await pool.query(
+    `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kitchen_ordering_settings'`
+  );
+  if (!tables.length) {
+    console.log('🔄 迁移：创建 kitchen_ordering_settings（全厨房默认订餐时段）…');
+    await pool.query(`
+      CREATE TABLE kitchen_ordering_settings (
+        id INT PRIMARY KEY DEFAULT 1,
+        breakfast_order_start TIME NOT NULL DEFAULT '06:30:00',
+        breakfast_order_end TIME NOT NULL DEFAULT '09:30:00',
+        lunch_order_start TIME NOT NULL DEFAULT '10:00:00',
+        lunch_order_end TIME NOT NULL DEFAULT '13:30:00',
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) COMMENT='全厨房统一默认订餐时段'
+    `);
+    await pool.query(`INSERT INTO kitchen_ordering_settings (id) VALUES (1)`);
+    console.log('   ✅ kitchen_ordering_settings 已创建并初始化');
+  }
+
+  const [[{ koCount }]] = await pool.query('SELECT COUNT(*) AS koCount FROM kitchen_ordering_settings');
+  if (!koCount) {
+    await pool.query(`INSERT INTO kitchen_ordering_settings (id) VALUES (1)`);
+    console.log('   ✅ kitchen_ordering_settings 已补充默认行（id=1）');
+  }
+
+  const [colRow] = await pool.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'daily_menus' AND COLUMN_NAME = 'breakfast_order_start'`
+  );
+  if (!colRow.length) {
+    console.log('🔄 迁移：daily_menus 增加按日订餐时段与覆盖字段 …');
+    await pool.query(`
+      ALTER TABLE daily_menus
+        ADD COLUMN breakfast_order_start TIME DEFAULT NULL COMMENT '按日覆盖早餐开始，NULL=全局',
+        ADD COLUMN breakfast_order_end TIME DEFAULT NULL COMMENT '按日覆盖早餐结束',
+        ADD COLUMN lunch_order_start TIME DEFAULT NULL COMMENT '按日覆盖午餐开始',
+        ADD COLUMN lunch_order_end TIME DEFAULT NULL COMMENT '按日覆盖午餐结束',
+        ADD COLUMN breakfast_ordering_override ENUM('auto','open','closed') NOT NULL DEFAULT 'auto' COMMENT '早餐：自动/强制开/强制关',
+        ADD COLUMN lunch_ordering_override ENUM('auto','open','closed') NOT NULL DEFAULT 'auto' COMMENT '午餐：自动/强制开/强制关'
+    `);
+    console.log('   ✅ daily_menus 订餐字段已添加');
+  }
+}
+
 async function migrateComments() {
   const [tables] = await pool.query(
     `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
@@ -281,6 +343,7 @@ async function initDatabase() {
   }
   await migrateSchema();
   await migrateComments();
+  await migrateOrderingWindow();
   console.log('✅ 数据库表初始化完成');
   await seedInitialData();
 }

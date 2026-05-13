@@ -413,7 +413,7 @@ export default function UsersPage() {
         />
       </PageListShell>
 
-      <Modal title={editingId ? '编辑用户' : '新增用户'} open={modalOpen}
+      <Modal title={editingId ? '编辑用户' : '新增用户'} open={modalOpen} destroyOnClose
         onOk={handleSubmit} onCancel={() => setModalOpen(false)} okText="保存">
         <Form form={form} layout="vertical">
           {!editingId && (
@@ -451,6 +451,7 @@ export default function UsersPage() {
       <Modal
         title="导入 / 同步工作平台人员"
         open={syncModalOpen}
+        destroyOnClose
         width={640}
         okText="立即同步"
         confirmLoading={syncLoading}
@@ -486,7 +487,7 @@ export default function UsersPage() {
         </Space>
       </Modal>
 
-      <Modal title="重置密码" open={pwdModalOpen}
+      <Modal title="重置密码" open={pwdModalOpen} destroyOnClose
         onOk={handleResetPwd} onCancel={() => setPwdModalOpen(false)} okText="确认重置">
         <Form form={pwdForm} layout="vertical">
           <Form.Item name="new_password" label="新密码" rules={[{ required: true, min: 6, message: '密码不少于6位' }]}>

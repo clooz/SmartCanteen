@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const { testConnection } = require('./db/connection');
 const { initDatabase } = require('./db/init');
 const routes = require('./routes/index');
+const { startOrderingScheduler } = require('./schedulers/orderingScheduler');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -55,9 +56,10 @@ async function start() {
   await testConnection();
   await initDatabase();
 
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 服务器已启动: http://localhost:${PORT}`);
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 服务器已启动: http://localhost:${PORT}（局域网请用本机 IPv4 访问）`);
     console.log(`📡 健康检查: http://localhost:${PORT}/api/health`);
+    startOrderingScheduler();
   });
 }
 

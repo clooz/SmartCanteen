@@ -272,6 +272,7 @@ export default function OrdersPage() {
       <Modal
         title="订单详情"
         open={!!detailOrder}
+        destroyOnClose
         onCancel={() => setDetailOrder(null)}
         footer={null}
         width={620}

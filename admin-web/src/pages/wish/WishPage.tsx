@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Table, Button, Tag, Modal, Form, Input, DatePicker, Space,
-  message, Typography, Popconfirm, Badge, InputNumber, Descriptions, Select, App, List, Avatar, Spin, Tooltip,
+  message, Typography, Popconfirm, Badge, InputNumber, Select, App, List, Avatar, Spin, Collapse, Empty,
 } from 'antd'
-import { PlusOutlined, TrophyOutlined, CheckOutlined, LikeOutlined, ReloadOutlined, StopOutlined, CommentOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons'
+import { PlusOutlined, TrophyOutlined, LikeOutlined, ReloadOutlined, StopOutlined, DeleteOutlined, UserOutlined, SearchOutlined, PlayCircleOutlined, EditOutlined } from '@ant-design/icons'
+import './WishPage.css'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
 import { wishApi } from '../../api/wish'
@@ -19,10 +20,12 @@ export default function WishPage() {
   const [loading, setLoading] = useState(false)
   const [createModal, setCreateModal] = useState(false)
   const [form] = Form.useForm()
+  const [editModal, setEditModal] = useState<any>(null)
+  const [editForm] = Form.useForm()
   const [itemsModal, setItemsModal] = useState<any>(null)
   const [wishItems, setWishItems] = useState<any[]>([])
-  const [adoptModal, setAdoptModal] = useState<any>(null)
-  const [adoptForm] = Form.useForm()
+  const [rankFilter, setRankFilter] = useState('')
+  const [commentPanelKeys, setCommentPanelKeys] = useState<string[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -32,7 +35,6 @@ export default function WishPage() {
   const [fItemCount, setFItemCount] = useState<number | undefined>()
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
-  const [expandedRowKeys, setExpandedRowKeys] = useState<number[]>([])
   const [commentMap, setCommentMap] = useState<Record<number, any[]>>({})
   const [commentLoadingSet, setCommentLoadingSet] = useState<Set<number>>(new Set())
 
@@ -89,6 +91,32 @@ export default function WishPage() {
     })
   }
 
+  const handleBatchReopen = () => {
+    const targets = pagedActivities.filter(r => selectedRowKeys.includes(r.id) && r.status === 'closed')
+    if (!targets.length) {
+      message.warning('选中的活动中没有「已结束」状态的活动')
+      return
+    }
+    modal.confirm({
+      title: `确认重新开启选中的 ${targets.length} 个许愿活动？`,
+      content: '开启后员工可继续许愿、投票与评论。若某活动截止时间已过，系统将自动把截止时间顺延 7 天。',
+      okText: '确认开启',
+      cancelText: '取消',
+      onOk: async () => {
+        setBatchLoading(true)
+        let ok = 0
+        try {
+          await Promise.all(targets.map(r =>
+            wishApi.reopenActivity(r.id).then(() => { ok++ }).catch(() => {})
+          ))
+          message.success(`已重新开启 ${ok} 个活动`)
+          setSelectedRowKeys([])
+          fetchActivities()
+        } finally { setBatchLoading(false) }
+      },
+    })
+  }
+
   useEffect(() => { fetchActivities() }, [])
 
   const resetFilters = () => {
@@ -113,6 +141,36 @@ export default function WishPage() {
     } catch { /* 统一处理 */ }
   }
 
+  const openEdit = (record: any) => {
+    setEditModal(record)
+    editForm.setFieldsValue({
+      title: record.title,
+      description: record.description ?? '',
+      dateRange: [dayjs(record.start_at), dayjs(record.end_at)],
+    })
+  }
+
+  const handleEditSave = async () => {
+    if (!editModal) return
+    const activityId = editModal.id
+    const values = await editForm.validateFields()
+    try {
+      await wishApi.updateActivity(activityId, {
+        title: values.title,
+        description: values.description,
+        start_at: values.dateRange[0].toISOString(),
+        end_at: values.dateRange[1].toISOString(),
+      })
+      message.success('活动已更新')
+      setEditModal(null)
+      editForm.resetFields()
+      fetchActivities()
+      if (itemsModal?.id === activityId) {
+        setItemsModal((prev: any) => (prev ? { ...prev, title: values.title } : null))
+      }
+    } catch { /* 统一处理 */ }
+  }
+
   const handleClose = async (id: number) => {
     try {
       await wishApi.closeActivity(id)
@@ -121,11 +179,20 @@ export default function WishPage() {
     } catch { /* 统一处理 */ }
   }
 
+  const handleReopen = async (id: number) => {
+    try {
+      const res: any = await wishApi.reopenActivity(id)
+      message.success(res?.message || '活动已重新开启')
+      fetchActivities()
+    } catch { /* 统一处理 */ }
+  }
+
   const openItems = async (activity: any) => {
     const res: any = await wishApi.getItems(activity.id)
     setWishItems(res.data || [])
     setItemsModal(activity)
-    setExpandedRowKeys([])
+    setCommentPanelKeys([])
+    setRankFilter('')
     setCommentMap({})
   }
 
@@ -147,18 +214,15 @@ export default function WishPage() {
     } catch { /* 统一处理 */ }
   }
 
-  const handleAdopt = async () => {
-    const values = await adoptForm.validateFields()
-    try {
-      await wishApi.adoptItem(adoptModal.id, values)
-      message.success('已采纳，菜品已加入菜品库！')
-      setAdoptModal(null)
-      if (itemsModal) {
-        const res: any = await wishApi.getItems(itemsModal.id)
-        setWishItems(res.data || [])
-      }
-    } catch { /* 统一处理 */ }
-  }
+  const filteredWishItems = useMemo(() => {
+    const q = rankFilter.trim().toLowerCase()
+    if (!q) return wishItems
+    return wishItems.filter((it) =>
+      String(it.dish_name || '').toLowerCase().includes(q) ||
+      String(it.description || '').toLowerCase().includes(q) ||
+      String(it.user_name || '').toLowerCase().includes(q)
+    )
+  }, [wishItems, rankFilter])
 
   const activityColumns = [
     {
@@ -225,136 +289,29 @@ export default function WishPage() {
       render: (v: string) => v || '-',
     },
     {
-      title: '操作', width: 220, align: 'left' as const,
+      title: '操作', width: 380, align: 'left' as const,
       render: (_: any, record: any) => (
         <Space size={4} wrap>
+          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</Button>
           <Button size="small" icon={<TrophyOutlined />} onClick={() => openItems(record)}>查看排行</Button>
           {record.status === 'active' && (
             <Popconfirm title="确认关闭活动？" onConfirm={() => handleClose(record.id)}>
               <Button size="small" danger>关闭</Button>
             </Popconfirm>
           )}
+          {record.status === 'closed' && (
+            <Popconfirm
+              title="确认重新开启该活动？"
+              description="开启后员工可继续许愿、投票与评论。若截止时间已过，将自动顺延 7 天。"
+              onConfirm={() => handleReopen(record.id)}
+              okText="开启"
+            >
+              <Button size="small" type="primary" ghost icon={<PlayCircleOutlined />}>
+                重新开启
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
-      ),
-    },
-  ]
-
-  const itemColumns = [
-    {
-      title: '排名', width: 60, align: 'center' as const,
-      render: (_: any, __: any, i: number) => <Tag color={i < 3 ? 'red' : 'default'}>{i + 1}</Tag>,
-    },
-    {
-      title: '菜品名称',
-      dataIndex: 'dish_name',
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
-        <div style={{ padding: 8 }}>
-          <Input placeholder="筛选菜品" value={selectedKeys[0]}
-            onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ marginBottom: 8, display: 'block' }} />
-          <Space>
-            <Button type="primary" size="small" onClick={() => confirm()}>搜索</Button>
-            <Button size="small" onClick={() => { clearFilters?.(); confirm() }}>重置</Button>
-          </Space>
-        </div>
-      ),
-      onFilter: (value: any, r: any) =>
-        !value || String(r.dish_name).toLowerCase().includes(String(value).toLowerCase()),
-      render: (v: string) => <Text strong>{v}</Text>,
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
-        <div style={{ padding: 8 }}>
-          <Input placeholder="筛选描述" value={selectedKeys[0]}
-            onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ marginBottom: 8, display: 'block' }} />
-          <Space>
-            <Button type="primary" size="small" onClick={() => confirm()}>搜索</Button>
-            <Button size="small" onClick={() => { clearFilters?.(); confirm() }}>重置</Button>
-          </Space>
-        </div>
-      ),
-      onFilter: (value: any, r: any) =>
-        !value || String(r.description || '').toLowerCase().includes(String(value).toLowerCase()),
-      render: (v: string) => v || '-',
-    },
-    {
-      title: '点赞数',
-      dataIndex: 'vote_count',
-      align: 'center' as const,
-      sorter: (a: any, b: any) => (a.vote_count || 0) - (b.vote_count || 0),
-      render: (v: number) => (
-        <Tag color="orange" icon={<LikeOutlined />}>{v} 票</Tag>
-      ),
-    },
-    {
-      title: '提交人',
-      dataIndex: 'user_name',
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
-        <div style={{ padding: 8 }}>
-          <Input placeholder="筛选提交人" value={selectedKeys[0]}
-            onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ marginBottom: 8, display: 'block' }} />
-          <Space>
-            <Button type="primary" size="small" onClick={() => confirm()}>搜索</Button>
-            <Button size="small" onClick={() => { clearFilters?.(); confirm() }}>重置</Button>
-          </Space>
-        </div>
-      ),
-      onFilter: (value: any, r: any) =>
-        !value || String(r.user_name || '').toLowerCase().includes(String(value).toLowerCase()),
-    },
-    {
-      title: '状态',
-      dataIndex: 'is_adopted',
-      align: 'center' as const,
-      filters: [
-        { text: '已采纳', value: 1 },
-        { text: '未采纳', value: 0 },
-      ],
-      onFilter: (v: any, r: any) => r.is_adopted === v,
-      render: (v: number) => v
-        ? <Tag color="green">已采纳</Tag>
-        : <Tag>未采纳</Tag>,
-    },
-    {
-      title: '评论',
-      dataIndex: 'comment_count',
-      align: 'center' as const,
-      width: 80,
-      render: (v: number, record: any) => (
-        <Tooltip title={expandedRowKeys.includes(record.id) ? '收起评论' : '查看评论'}>
-          <Button
-            size="small"
-            type={expandedRowKeys.includes(record.id) ? 'primary' : 'default'}
-            icon={<CommentOutlined />}
-            onClick={() => {
-              const isExpanded = expandedRowKeys.includes(record.id)
-              if (isExpanded) {
-                setExpandedRowKeys(prev => prev.filter(k => k !== record.id))
-              } else {
-                setExpandedRowKeys(prev => [...prev, record.id])
-                if (commentMap[record.id] === undefined) fetchComments(record.id)
-              }
-            }}
-          >
-            {v || 0}
-          </Button>
-        </Tooltip>
-      ),
-    },
-    {
-      title: '操作', width: 88, align: 'left' as const,
-      render: (_: any, record: any) => !record.is_adopted && (
-        <Button size="small" type="primary" icon={<CheckOutlined />}
-          onClick={() => { setAdoptModal(record); adoptForm.resetFields() }}>
-          采纳
-        </Button>
       ),
     },
   ]
@@ -372,6 +329,8 @@ export default function WishPage() {
                 </Text>
                 <Button danger icon={<StopOutlined />} loading={batchLoading}
                   onClick={handleBatchClose}>批量关闭</Button>
+                <Button type="primary" ghost icon={<PlayCircleOutlined />} loading={batchLoading}
+                  onClick={handleBatchReopen}>批量开启</Button>
               </>
             )}
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setCreateModal(true) }}>
@@ -413,7 +372,7 @@ export default function WishPage() {
           dataSource={pagedActivities}
           columns={activityColumns}
           loading={loading}
-          scroll={{ x: 960 }}
+          scroll={{ x: 1080 }}
           rowSelection={{
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys as number[]),
@@ -427,7 +386,7 @@ export default function WishPage() {
         />
       </PageListShell>
 
-      <Modal title="发起许愿活动" open={createModal} onOk={handleCreate} onCancel={() => setCreateModal(false)} okText="发起">
+      <Modal title="发起许愿活动" open={createModal} destroyOnClose onOk={handleCreate} onCancel={() => setCreateModal(false)} okText="发起">
         <Form form={form} layout="vertical">
           <Form.Item name="title" label="活动标题" rules={[{ required: true }]}>
             <Input placeholder="如：五月许愿菜品征集" />
@@ -442,98 +401,153 @@ export default function WishPage() {
       </Modal>
 
       <Modal
-        title={`「${itemsModal?.title}」许愿排行榜`}
-        open={!!itemsModal}
-        onCancel={() => setItemsModal(null)}
-        footer={null}
-        width={880}
+        title="编辑许愿活动"
+        open={!!editModal}
+        onOk={handleEditSave}
+        onCancel={() => { setEditModal(null); editForm.resetFields() }}
+        okText="保存"
+        destroyOnClose
       >
-        <Table
-          rowKey="id"
-          dataSource={wishItems}
-          columns={itemColumns}
-          pagination={false}
-          size="small"
-          scroll={{ x: 900 }}
-          expandable={{
-            expandedRowKeys,
-            showExpandColumn: false,
-            expandedRowRender: (record: any) => {
-              const comments = commentMap[record.id]
-              const isLoading = commentLoadingSet.has(record.id)
-              if (isLoading) return <div style={{ padding: '12px 0', textAlign: 'center' }}><Spin size="small" /></div>
-              if (!comments || comments.length === 0) return (
-                <div style={{ padding: '12px 24px', color: '#94A3B8', fontSize: 13 }}>暂无评论</div>
-              )
-              return (
-                <List
-                  size="small"
-                  style={{ padding: '4px 24px 8px', background: '#FAFAFA', borderRadius: 6 }}
-                  dataSource={comments}
-                  renderItem={(c: any) => (
-                    <List.Item
-                      style={{ padding: '6px 0' }}
-                      actions={[
-                        <Popconfirm
-                          key="del"
-                          title="确认删除此评论？"
-                          onConfirm={() => handleDeleteComment(record.id, c.id)}
-                          okText="删除"
-                          okButtonProps={{ danger: true }}
-                        >
-                          <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                        </Popconfirm>
-                      ]}
-                    >
-                      <List.Item.Meta
-                        avatar={<Avatar size={24} icon={<UserOutlined />} style={{ background: '#E2E8F0', color: '#64748B' }} />}
-                        title={
-                          <Space size={6}>
-                            <span style={{ fontWeight: 500, fontSize: 13 }}>{c.user_name || '用户'}</span>
-                            <span style={{ color: '#94A3B8', fontSize: 11, fontWeight: 400 }}>
-                              {new Date(c.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </Space>
-                        }
-                        description={<span style={{ color: '#334155', fontSize: 13 }}>{c.content}</span>}
-                      />
-                    </List.Item>
-                  )}
-                />
-              )
-            },
-          }}
-        />
+        <Form form={editForm} layout="vertical">
+          <Form.Item name="title" label="活动标题" rules={[{ required: true }]}>
+            <Input placeholder="如：五月许愿菜品征集" />
+          </Form.Item>
+          <Form.Item name="description" label="活动说明">
+            <Input.TextArea rows={2} placeholder="告诉大家这次许愿的主题或规则" />
+          </Form.Item>
+          <Form.Item name="dateRange" label="活动时间" rules={[{ required: true }]}>
+            <RangePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
       </Modal>
 
-      <Modal title="采纳许愿菜品" open={!!adoptModal} onOk={handleAdopt}
-        onCancel={() => setAdoptModal(null)} okText="确认采纳">
-        {adoptModal && (
-          <>
-            <Descriptions
-              column={1}
-              bordered
-              labelStyle={{ color: '#64748B', fontWeight: 500, width: 80, whiteSpace: 'nowrap' }}
-              contentStyle={{ color: '#0F172A' }}
-              style={{ marginBottom: 20 }}
-            >
-              <Descriptions.Item label="菜品名称">{adoptModal.dish_name}</Descriptions.Item>
-              <Descriptions.Item label="描述">{adoptModal.description || '-'}</Descriptions.Item>
-              <Descriptions.Item label="点赞数">{adoptModal.vote_count} 票</Descriptions.Item>
-            </Descriptions>
-            <Form form={adoptForm} layout="vertical">
-              <Form.Item name="price" label="定价（元）" rules={[{ required: true, message: '请设置价格' }]}>
-                <InputNumber min={0.01} step={0.5} precision={2} style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item name="category" label="分类">
-                <Input placeholder="荤菜 / 素菜 / 主食 等" />
-              </Form.Item>
-              <Form.Item name="description" label="菜品描述（可选）">
-                <Input.TextArea rows={2} />
-              </Form.Item>
-            </Form>
-          </>
-        )}
+      <Modal
+        className="wish-rank-modal"
+        title={`「${itemsModal?.title}」许愿排行榜`}
+        open={!!itemsModal}
+        onCancel={() => {
+          setItemsModal(null)
+          setCommentPanelKeys([])
+          setRankFilter('')
+        }}
+        footer={null}
+        width={680}
+        destroyOnClose
+      >
+        <div className="wish-rank-toolbar">
+          <Input
+            allowClear
+            prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+            placeholder="筛选菜品、描述或提交人"
+            value={rankFilter}
+            onChange={(e) => setRankFilter(e.target.value)}
+          />
+        </div>
+        <div className="wish-rank-scroll">
+          {!wishItems.length ? (
+            <Empty description="暂无许愿条目" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          ) : !filteredWishItems.length ? (
+            <Empty description="没有符合筛选条件的条目" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          ) : (
+            <Collapse
+              className="wish-rank-collapse"
+              bordered={false}
+              expandIconPosition="end"
+              activeKey={commentPanelKeys}
+              onChange={(key) => {
+                const keys = (Array.isArray(key) ? key : [key]).filter(Boolean) as string[]
+                setCommentPanelKeys(keys)
+                keys.forEach((k) => {
+                  const id = Number(k)
+                  if (!Number.isNaN(id) && commentMap[id] === undefined) {
+                    fetchComments(id)
+                  }
+                })
+              }}
+              items={filteredWishItems.map((item, idx) => {
+                const badgeExtra = idx === 0 ? 'wish-rank-badge--1' : idx === 1 ? 'wish-rank-badge--2' : idx === 2 ? 'wish-rank-badge--3' : ''
+                return {
+                  key: String(item.id),
+                  label: (
+                    <div className="wish-rank-collapse__label">
+                      <div className={`wish-rank-badge ${badgeExtra}`.trim()}>
+                        {idx + 1}
+                      </div>
+                      <div className="wish-rank-main">
+                        <div className="wish-rank-title-row">
+                          <span className="wish-rank-dish-name">{item.dish_name}</span>
+                          <Tag color="orange" icon={<LikeOutlined style={{ fontSize: 12 }} />}>
+                            {item.vote_count ?? 0} 票
+                          </Tag>
+                        </div>
+                        {item.description ? (
+                          <div className="wish-rank-desc">{item.description}</div>
+                        ) : null}
+                        <div className="wish-rank-meta">
+                          <UserOutlined style={{ marginRight: 4 }} />
+                          提交人：{item.user_name || '—'}
+                          {(item.comment_count ?? 0) > 0 ? (
+                            <span style={{ marginLeft: 10 }}>
+                              · {item.comment_count} 条评论
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ),
+                  children: (() => {
+                    const isLoading = commentLoadingSet.has(item.id)
+                    const comments = commentMap[item.id]
+                    if (isLoading && comments === undefined) {
+                      return <div className="wish-rank-spin"><Spin /></div>
+                    }
+                    if (!comments || comments.length === 0) {
+                      return <div className="wish-rank-comments-empty">暂无评论</div>
+                    }
+                    return (
+                      <div className="wish-rank-comments">
+                        <List
+                          size="small"
+                          dataSource={comments}
+                          renderItem={(c: any) => (
+                            <List.Item
+                              style={{ borderBlockEnd: 'none' }}
+                              actions={[
+                                <Popconfirm
+                                  key="del"
+                                  title="确认删除此评论？"
+                                  onConfirm={() => handleDeleteComment(item.id, c.id)}
+                                  okText="删除"
+                                  okButtonProps={{ danger: true }}
+                                >
+                                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                                </Popconfirm>,
+                              ]}
+                            >
+                              <List.Item.Meta
+                                avatar={<Avatar size={28} icon={<UserOutlined />} style={{ background: '#e2e8f0', color: '#64748b' }} />}
+                                title={
+                                  <Space size={8} wrap>
+                                    <span style={{ fontWeight: 600 }}>{c.user_name || '用户'}</span>
+                                    <span style={{ color: '#94a3b8', fontSize: 12, fontWeight: 400 }}>
+                                      {new Date(c.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </Space>
+                                }
+                                description={<span style={{ color: '#334155', fontSize: 13 }}>{c.content}</span>}
+                              />
+                            </List.Item>
+                          )}
+                        />
+                      </div>
+                    )
+                  })(),
+                }
+              })
+            }
+          />
+          )}
+        </div>
       </Modal>
     </div>
   )

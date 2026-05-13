@@ -456,7 +456,7 @@ export default function DishesPage() {
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         width={460}
-        destroyOnHidden
+        destroyOnClose
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{

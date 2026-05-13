@@ -257,6 +257,7 @@ export default function RechargePage() {
       <Modal
         title={reviewAction === 'completed' ? '标记充值完成' : '驳回充值申请'}
         open={!!reviewModal}
+        destroyOnClose
         onOk={handleReview}
         onCancel={() => setReviewModal(null)}
         okText="确认"

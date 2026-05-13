@@ -66,6 +66,30 @@ const createActivity = async (req, res) => {
   }
 };
 
+// 更新许愿活动（管理员/厨师）
+const updateActivity = async (req, res) => {
+  const { title, description, start_at, end_at } = req.body;
+  if (!title || !start_at || !end_at) return fail(res, '标题、开始时间和截止时间不能为空');
+  const startAt = toMySQLDateTime(start_at);
+  const endAt = toMySQLDateTime(end_at);
+  if (!startAt || !endAt) return fail(res, '时间格式不正确');
+  if (new Date(endAt) <= new Date(startAt)) return fail(res, '截止时间必须晚于开始时间');
+
+  try {
+    const [existing] = await pool.query('SELECT id FROM wish_activities WHERE id = ?', [req.params.id]);
+    if (existing.length === 0) return fail(res, '活动不存在', 404);
+
+    await pool.query(
+      'UPDATE wish_activities SET title = ?, description = ?, start_at = ?, end_at = ? WHERE id = ?',
+      [String(title).trim(), description || '', startAt, endAt, req.params.id]
+    );
+    return success(res, null, '活动已更新');
+  } catch (err) {
+    console.error('updateActivity error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
 // 关闭活动（管理员/厨师）
 const closeActivity = async (req, res) => {
   try {
@@ -76,6 +100,43 @@ const closeActivity = async (req, res) => {
     return success(res, null, '活动已关闭');
   } catch (err) {
     console.error('closeActivity error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
+// 重新开启活动（管理员/厨师）：仅 closed → active；若截止时间已过则顺延 7 天，避免立刻再次被自动关闭
+const reopenActivity = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, status, end_at FROM wish_activities WHERE id = ?',
+      [req.params.id]
+    );
+    if (rows.length === 0) return fail(res, '活动不存在', 404);
+    if (rows[0].status !== 'closed') {
+      return fail(res, '仅「已结束」的活动可以重新开启');
+    }
+
+    const now = new Date();
+    const end = new Date(rows[0].end_at);
+    if (Number.isNaN(end.getTime())) {
+      return fail(res, '活动截止时间无效，无法重新开启', 400);
+    }
+
+    if (end <= now) {
+      const newEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const newEndSql = toMySQLDateTime(newEnd);
+      await pool.query(
+        "UPDATE wish_activities SET status = 'active', end_at = ? WHERE id = ?",
+        [newEndSql, req.params.id]
+      );
+      const tip = `活动已重新开启；原截止时间已过，已自动将截止时间顺延 7 天（至 ${newEndSql.slice(0, 16)}）`;
+      return success(res, { end_at: newEndSql }, tip);
+    }
+
+    await pool.query("UPDATE wish_activities SET status = 'active' WHERE id = ?", [req.params.id]);
+    return success(res, null, '活动已重新开启');
+  } catch (err) {
+    console.error('reopenActivity error:', err);
     return fail(res, '服务器错误', 500);
   }
 };
@@ -366,4 +427,4 @@ const deleteComment = async (req, res) => {
   }
 };
 
-module.exports = { getActivities, createActivity, closeActivity, getWishItems, createWishItem, voteWishItem, unvoteWishItem, adoptWishItem, getComments, createComment, deleteComment };
+module.exports = { getActivities, createActivity, updateActivity, closeActivity, reopenActivity, getWishItems, createWishItem, voteWishItem, unvoteWishItem, adoptWishItem, getComments, createComment, deleteComment };

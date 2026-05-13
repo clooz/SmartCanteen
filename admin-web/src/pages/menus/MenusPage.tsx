@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   Table, Button, Tag, Modal, DatePicker, Space, message, App,
-  Transfer, Descriptions, Select, Input, Typography, Tooltip, Dropdown,
+  Transfer, Descriptions, Select, Input, Typography, Tooltip, Dropdown, Popconfirm,
+  TimePicker,
 } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   PlusOutlined, ReloadOutlined,
   CheckCircleOutlined, StopOutlined, DeleteOutlined,
-  EditOutlined, EyeOutlined, MoreOutlined,
+  EditOutlined, EyeOutlined, MoreOutlined, PlayCircleOutlined,
 } from '@ant-design/icons'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { menusApi } from '../../api/menus'
@@ -28,6 +29,25 @@ const MEAL_TYPE_MAP: Record<string, { label: string; color: string }> = {
   lunch: { label: '午餐', color: 'blue' },
 }
 
+const OVERRIDE_OPTIONS = [
+  { value: 'auto', label: '自动（按时段）' },
+  { value: 'open', label: '强制开启' },
+  { value: 'closed', label: '强制关闭' },
+]
+
+function timeStrToDayjs(t: string | null | undefined): Dayjs | null {
+  if (t == null || t === '') return null
+  const m = String(t).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/)
+  if (!m) return null
+  const h = m[1].padStart(2, '0')
+  const mi = m[2]
+  return dayjs(`2000-01-01 ${h}:${mi}`, 'YYYY-MM-DD HH:mm')
+}
+
+function fmtSubmitTime(d: Dayjs | null) {
+  return d && d.isValid() ? d.format('HH:mm') : null
+}
+
 export default function MenusPage() {
   const { modal } = App.useApp()
 
@@ -46,6 +66,21 @@ export default function MenusPage() {
 
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
+
+  const [globalOrdering, setGlobalOrdering] = useState<any>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsSubmitting, setSettingsSubmitting] = useState(false)
+  const [gBfStart, setGBfStart] = useState<Dayjs | null>(null)
+  const [gBfEnd, setGBfEnd] = useState<Dayjs | null>(null)
+  const [gLuStart, setGLuStart] = useState<Dayjs | null>(null)
+  const [gLuEnd, setGLuEnd] = useState<Dayjs | null>(null)
+
+  const [bfOrdStart, setBfOrdStart] = useState<Dayjs | null>(null)
+  const [bfOrdEnd, setBfOrdEnd] = useState<Dayjs | null>(null)
+  const [luOrdStart, setLuOrdStart] = useState<Dayjs | null>(null)
+  const [luOrdEnd, setLuOrdEnd] = useState<Dayjs | null>(null)
+  const [bfOverride, setBfOverride] = useState<string>('auto')
+  const [luOverride, setLuOverride] = useState<string>('auto')
 
   const [colMenuDate, setColMenuDate] = useState<string | undefined>()
   const [colStatus, setColStatus] = useState<string | undefined>()
@@ -74,7 +109,19 @@ export default function MenusPage() {
     setAllDishes(res.data.list)
   }
 
-  useEffect(() => { fetchAllDishes() }, [])
+  const loadGlobalOrdering = async () => {
+    try {
+      const res: any = await menusApi.getOrderingDefaults()
+      setGlobalOrdering(res.data)
+    } catch {
+      /* 已由 request 提示 */
+    }
+  }
+
+  useEffect(() => {
+    fetchAllDishes()
+    loadGlobalOrdering()
+  }, [])
 
   useEffect(() => {
     fetchData(page, pageSize)
@@ -85,6 +132,12 @@ export default function MenusPage() {
     setSelectedDate(dayjs())
     setBreakfastDishIds([])
     setLunchDishIds([])
+    setBfOrdStart(null)
+    setBfOrdEnd(null)
+    setLuOrdStart(null)
+    setLuOrdEnd(null)
+    setBfOverride('auto')
+    setLuOverride('auto')
     setModalOpen(true)
   }
 
@@ -106,6 +159,12 @@ export default function MenusPage() {
       setLunchDishIds(
         dishes.filter((d: any) => !d.meal_type || d.meal_type === 'lunch').map((d: any) => String(d.id))
       )
+      setBfOrdStart(timeStrToDayjs(res.data.breakfast_order_start))
+      setBfOrdEnd(timeStrToDayjs(res.data.breakfast_order_end))
+      setLuOrdStart(timeStrToDayjs(res.data.lunch_order_start))
+      setLuOrdEnd(timeStrToDayjs(res.data.lunch_order_end))
+      setBfOverride(res.data.breakfast_ordering_override || 'auto')
+      setLuOverride(res.data.lunch_ordering_override || 'auto')
       setModalOpen(true)
     } catch {
       /* 错误已由 request 拦截器提示 */
@@ -123,6 +182,12 @@ export default function MenusPage() {
         breakfast_dish_ids: breakfastDishIds.map(Number),
         lunch_dish_ids: lunchDishIds.map(Number),
         status: 'draft',
+        breakfast_order_start: fmtSubmitTime(bfOrdStart),
+        breakfast_order_end: fmtSubmitTime(bfOrdEnd),
+        lunch_order_start: fmtSubmitTime(luOrdStart),
+        lunch_order_end: fmtSubmitTime(luOrdEnd),
+        breakfast_ordering_override: bfOverride,
+        lunch_ordering_override: luOverride,
       })
       message.success('菜单保存成功')
       setModalOpen(false)
@@ -146,16 +211,59 @@ export default function MenusPage() {
     } catch { /* 统一处理 */ }
   }
 
-  /** 批量发布（仅对草稿生效） */
+  const openGlobalSettings = async () => {
+    let g = globalOrdering
+    if (!g) {
+      try {
+        const res: any = await menusApi.getOrderingDefaults()
+        g = res.data
+        setGlobalOrdering(g)
+      } catch {
+        return
+      }
+    }
+    if (g) {
+      setGBfStart(timeStrToDayjs(g.breakfast_order_start))
+      setGBfEnd(timeStrToDayjs(g.breakfast_order_end))
+      setGLuStart(timeStrToDayjs(g.lunch_order_start))
+      setGLuEnd(timeStrToDayjs(g.lunch_order_end))
+    }
+    setSettingsOpen(true)
+  }
+
+  const handleSaveGlobalOrdering = async () => {
+    if (!gBfStart?.isValid() || !gBfEnd?.isValid() || !gLuStart?.isValid() || !gLuEnd?.isValid()) {
+      message.error('请填写完整的四个订餐时段')
+      return
+    }
+    setSettingsSubmitting(true)
+    try {
+      const res: any = await menusApi.updateOrderingDefaults({
+        breakfast_order_start: fmtSubmitTime(gBfStart),
+        breakfast_order_end: fmtSubmitTime(gBfEnd),
+        lunch_order_start: fmtSubmitTime(gLuStart),
+        lunch_order_end: fmtSubmitTime(gLuEnd),
+      })
+      setGlobalOrdering(res.data)
+      message.success(res.message || '已保存')
+      setSettingsOpen(false)
+    } finally {
+      setSettingsSubmitting(false)
+    }
+  }
+
+  /** 批量发布（草稿或已关闭可再次发布） */
   const handleBatchPublish = () => {
-    const targets = data.filter(r => selectedRowKeys.includes(r.id) && r.status === 'draft')
+    const targets = data.filter(
+      r => selectedRowKeys.includes(r.id) && (r.status === 'draft' || r.status === 'closed')
+    )
     if (!targets.length) {
-      message.warning('所选菜单中没有可发布的草稿')
+      message.warning('所选菜单中没有可发布的项（仅草稿或已关闭可发布）')
       return
     }
     modal.confirm({
-      title: `确认发布选中的 ${targets.length} 个草稿菜单？`,
-      content: '发布后员工可正常点餐',
+      title: `确认发布选中的 ${targets.length} 个菜单？`,
+      content: '员工端将显示该日菜单；能否下单以订餐时段为准。',
       okText: '确认发布',
       cancelText: '取消',
       onOk: async () => {
@@ -179,7 +287,7 @@ export default function MenusPage() {
     }
     modal.confirm({
       title: `确认关闭选中的 ${targets.length} 个已发布菜单？`,
-      content: '关闭后员工无法继续点餐',
+      content: '员工端将隐藏该日菜单；订餐时段设置不变。',
       okText: '确认关闭',
       okButtonProps: { danger: true },
       cancelText: '取消',
@@ -468,19 +576,33 @@ export default function MenusPage() {
               编辑
             </Button>
             {record.status === 'draft' && (
-              <Tooltip title="发布后员工可点餐">
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => handleStatusChange(record.id, 'published')}
-                >
+              <Popconfirm
+                title="确认发布该日菜单？"
+                description="员工可见菜单；能否下单以订餐时段为准。"
+                onConfirm={() => handleStatusChange(record.id, 'published')}
+                okText="发布"
+                cancelText="取消"
+              >
+                <Button size="small" type="primary" ghost icon={<CheckCircleOutlined />}>
                   发布
                 </Button>
-              </Tooltip>
+              </Popconfirm>
+            )}
+            {record.status === 'closed' && (
+              <Popconfirm
+                title="确认重新发布该日菜单？"
+                description="员工可见菜单；能否下单以订餐时段为准。"
+                onConfirm={() => handleStatusChange(record.id, 'published')}
+                okText="发布"
+                cancelText="取消"
+              >
+                <Button size="small" type="primary" ghost icon={<PlayCircleOutlined />}>
+                  重新发布
+                </Button>
+              </Popconfirm>
             )}
             {record.status === 'published' && (
-              <Tooltip title="关闭后停止点餐">
+              <Tooltip title="仅隐藏该日菜单；下单仍看订餐时段。">
                 <Button
                   size="small"
                   icon={<StopOutlined />}
@@ -534,6 +656,7 @@ export default function MenusPage() {
                 >批量删除</Button>
               </>
             )}
+            <Button onClick={openGlobalSettings}>全局订餐时段</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增菜单</Button>
           </Space>
         }
@@ -596,8 +719,38 @@ export default function MenusPage() {
       </PageListShell>
 
       <Modal
+        title="全局默认订餐时段"
+        open={settingsOpen}
+        destroyOnClose
+        onOk={handleSaveGlobalOrdering}
+        onCancel={() => setSettingsOpen(false)}
+        confirmLoading={settingsSubmitting}
+        okText="保存"
+        width={520}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Text type="secondary">
+            未在「按日菜单」里单独填写的时间，将使用此处默认值；按日可覆盖或设置强制开/关。
+          </Text>
+          <div>
+            <Text strong style={{ marginRight: 12 }}>早餐</Text>
+            <TimePicker value={gBfStart} onChange={setGBfStart} format="HH:mm" needConfirm={false} minuteStep={5} />
+            <Text type="secondary" style={{ margin: '0 8px' }}>至</Text>
+            <TimePicker value={gBfEnd} onChange={setGBfEnd} format="HH:mm" needConfirm={false} minuteStep={5} />
+          </div>
+          <div>
+            <Text strong style={{ marginRight: 12 }}>午餐</Text>
+            <TimePicker value={gLuStart} onChange={setGLuStart} format="HH:mm" needConfirm={false} minuteStep={5} />
+            <Text type="secondary" style={{ margin: '0 8px' }}>至</Text>
+            <TimePicker value={gLuEnd} onChange={setGLuEnd} format="HH:mm" needConfirm={false} minuteStep={5} />
+          </div>
+        </Space>
+      </Modal>
+
+      <Modal
         title={editingMenuId ? '编辑菜单' : '新建菜单'}
         open={modalOpen}
+        destroyOnClose
         width={760}
         wrapClassName="menu-modal-soft-scroll"
         onOk={handleSubmit}
@@ -609,6 +762,33 @@ export default function MenusPage() {
             <span style={{ marginRight: 8 }}>菜单日期：</span>
             <DatePicker value={selectedDate} onChange={setSelectedDate}
               disabledDate={d => d < dayjs().startOf('day')} />
+          </div>
+          <div style={{ paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+            <Text strong>该日订餐时段</Text>
+            <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+              留空则沿用全局
+              {globalOrdering && (
+                <>
+                  {' '}
+                  （早 {String(globalOrdering.breakfast_order_start ?? '').slice(0, 5)}–{String(globalOrdering.breakfast_order_end ?? '').slice(0, 5)}，
+                  午 {String(globalOrdering.lunch_order_start ?? '').slice(0, 5)}–{String(globalOrdering.lunch_order_end ?? '').slice(0, 5)}）
+                </>
+              )}
+            </Text>
+            <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <Text style={{ width: 40 }}>早餐</Text>
+              <TimePicker allowClear value={bfOrdStart} onChange={setBfOrdStart} format="HH:mm" needConfirm={false} minuteStep={5} placeholder="开始" />
+              <Text type="secondary">至</Text>
+              <TimePicker allowClear value={bfOrdEnd} onChange={setBfOrdEnd} format="HH:mm" needConfirm={false} minuteStep={5} placeholder="结束" />
+              <Select style={{ width: 150 }} value={bfOverride} onChange={setBfOverride} options={OVERRIDE_OPTIONS} />
+            </div>
+            <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <Text style={{ width: 40 }}>午餐</Text>
+              <TimePicker allowClear value={luOrdStart} onChange={setLuOrdStart} format="HH:mm" needConfirm={false} minuteStep={5} placeholder="开始" />
+              <Text type="secondary">至</Text>
+              <TimePicker allowClear value={luOrdEnd} onChange={setLuOrdEnd} format="HH:mm" needConfirm={false} minuteStep={5} placeholder="结束" />
+              <Select style={{ width: 150 }} value={luOverride} onChange={setLuOverride} options={OVERRIDE_OPTIONS} />
+            </div>
           </div>
           <div>
             <div style={{ marginBottom: 8 }}>
@@ -646,6 +826,7 @@ export default function MenusPage() {
       <Modal
         title="菜单详情"
         open={!!detailModal}
+        destroyOnClose
         onCancel={() => setDetailModal(null)}
         footer={null}
         width={760}
@@ -667,6 +848,54 @@ export default function MenusPage() {
                   {STATUS_MAP[detailModal.status]?.label}
                 </Tag>
               </Descriptions.Item>
+              {detailModal.ordering && (
+                <>
+                  <Descriptions.Item label="早餐订餐" span={2}>
+                    <Space wrap size="small">
+                      <Tag color={detailModal.ordering.breakfast.accepting ? 'green' : 'default'}>
+                        {detailModal.ordering.breakfast.accepting ? '当前可订' : '当前不可订'}
+                      </Tag>
+                      {!!detailModal.ordering.breakfast.window && (
+                        <Text type="secondary">时段 {detailModal.ordering.breakfast.window}</Text>
+                      )}
+                      <Text type="secondary">
+                        策略：{OVERRIDE_OPTIONS.find(o => o.value === detailModal.breakfast_ordering_override)?.label ?? '自动'}
+                      </Text>
+                      {(detailModal.breakfast_order_start != null || detailModal.breakfast_order_end != null) && (
+                        <Text>
+                          按日时间：{String(detailModal.breakfast_order_start ?? '').slice(0, 5) || '—'}
+                          –{String(detailModal.breakfast_order_end ?? '').slice(0, 5) || '—'}
+                        </Text>
+                      )}
+                      {!!detailModal.ordering.breakfast.message && (
+                        <Text type="warning">{detailModal.ordering.breakfast.message}</Text>
+                      )}
+                    </Space>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="午餐订餐" span={2}>
+                    <Space wrap size="small">
+                      <Tag color={detailModal.ordering.lunch.accepting ? 'green' : 'default'}>
+                        {detailModal.ordering.lunch.accepting ? '当前可订' : '当前不可订'}
+                      </Tag>
+                      {!!detailModal.ordering.lunch.window && (
+                        <Text type="secondary">时段 {detailModal.ordering.lunch.window}</Text>
+                      )}
+                      <Text type="secondary">
+                        策略：{OVERRIDE_OPTIONS.find(o => o.value === detailModal.lunch_ordering_override)?.label ?? '自动'}
+                      </Text>
+                      {(detailModal.lunch_order_start != null || detailModal.lunch_order_end != null) && (
+                        <Text>
+                          按日时间：{String(detailModal.lunch_order_start ?? '').slice(0, 5) || '—'}
+                          –{String(detailModal.lunch_order_end ?? '').slice(0, 5) || '—'}
+                        </Text>
+                      )}
+                      {!!detailModal.ordering.lunch.message && (
+                        <Text type="warning">{detailModal.ordering.lunch.message}</Text>
+                      )}
+                    </Space>
+                  </Descriptions.Item>
+                </>
+              )}
             </Descriptions>
             <Table
               size="small"

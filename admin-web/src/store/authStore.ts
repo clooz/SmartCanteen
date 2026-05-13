@@ -13,7 +13,16 @@ export const authStore = {
   getToken: () => localStorage.getItem('token') || '',
   getUser: (): UserInfo | null => {
     const raw = localStorage.getItem('user')
-    return raw ? JSON.parse(raw) : null
+    if (!raw) return null
+    try {
+      const u = JSON.parse(raw) as UserInfo
+      if (!u || typeof u !== 'object') return null
+      return u
+    } catch {
+      localStorage.removeItem('user')
+      localStorage.removeItem('token')
+      return null
+    }
   },
   setAuth: (token: string, user: UserInfo) => {
     localStorage.setItem('token', token)
@@ -23,5 +32,7 @@ export const authStore = {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
   },
-  isLoggedIn: () => !!localStorage.getItem('token'),
+  /** 同时存在 token 与 user 才视为已登录，避免仅有残留 token 时逻辑抖动 */
+  isLoggedIn: () =>
+    !!localStorage.getItem('token') && !!localStorage.getItem('user'),
 }

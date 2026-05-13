@@ -1,18 +1,29 @@
 const { pool } = require('../db/connection');
 const { success, fail } = require('../utils/response');
+const { getKitchenOrderingSettings } = require('../services/kitchenOrderingSettings');
+const {
+  buildOrderingSummary,
+  normalizeTimeForDb,
+  normalizeOverride,
+} = require('../utils/orderingRules');
 
 // 获取某日菜单（含菜品列表）
+// 员工端仅展示「已发布」；管理员/厨师端可查看草稿/已关闭以便编辑（与 admin 菜单页 getByDate 一致）
 const getMenuByDate = async (req, res) => {
   const date = req.params.date; // 格式 YYYY-MM-DD
+  const employeeView = req.user?.role === 'employee';
 
   try {
-    const [menus] = await pool.query(
-      'SELECT * FROM daily_menus WHERE menu_date = ?',
-      [date]
-    );
+    let sql = 'SELECT * FROM daily_menus WHERE menu_date = ?';
+    const params = [date];
+    if (employeeView) {
+      sql += " AND status = 'published'";
+    }
+    const [menus] = await pool.query(sql, params);
 
     if (menus.length === 0) {
-      return success(res, null, '该日暂无菜单');
+      const msg = employeeView ? '该日菜单暂未发布' : '该日暂无菜单';
+      return success(res, null, msg);
     }
 
     const menu = menus[0];
@@ -26,7 +37,15 @@ const getMenuByDate = async (req, res) => {
       [menu.id]
     );
 
-    return success(res, { ...menu, dishes });
+    let ordering = null;
+    try {
+      const settings = await getKitchenOrderingSettings();
+      ordering = buildOrderingSummary(menu, settings);
+    } catch (e) {
+      console.warn('buildOrderingSummary skipped:', e.message);
+    }
+
+    return success(res, { ...menu, dishes, ordering });
   } catch (err) {
     console.error('getMenuByDate error:', err);
     return fail(res, '服务器错误', 500);
@@ -192,6 +211,33 @@ const createOrUpdateMenu = async (req, res) => {
           [menuId, row.dish_id, 'lunch', row.stock]
         );
       }
+    }
+
+    const ordFields = [];
+    const ordVals = [];
+    const ordSpec = [
+      'breakfast_order_start',
+      'breakfast_order_end',
+      'lunch_order_start',
+      'lunch_order_end',
+      'breakfast_ordering_override',
+      'lunch_ordering_override',
+    ];
+    for (const col of ordSpec) {
+      if (Object.prototype.hasOwnProperty.call(req.body, col)) {
+        ordFields.push(`${col} = ?`);
+        if (col.endsWith('_override')) {
+          ordVals.push(normalizeOverride(req.body[col]));
+        } else {
+          ordVals.push(normalizeTimeForDb(req.body[col]));
+        }
+      }
+    }
+    if (ordFields.length) {
+      await conn.query(
+        `UPDATE daily_menus SET ${ordFields.join(', ')} WHERE id = ?`,
+        [...ordVals, menuId]
+      );
     }
 
     await conn.commit();
