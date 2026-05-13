@@ -3,6 +3,7 @@ import { Table, Tag, Select, DatePicker, Space, Typography, Button, Modal, Descr
 import { ReloadOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
+import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
 import { ordersApi } from '../../api/orders'
 import dayjs from 'dayjs'
 
@@ -35,6 +36,7 @@ export default function OrdersPage() {
   const [ordersListFilterKey, setOrdersListFilterKey] = useState(0)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   const resetOrderFilters = () => {
     setFilterStatus(undefined)
@@ -96,6 +98,7 @@ export default function OrdersPage() {
   const fetchData = async (p = page, ps = pageSize) => {
     setLoading(true)
     setSelectedRowKeys([])
+    setLoadError(false)
     try {
       const res: any = await ordersApi.getAll({
         page: p,
@@ -108,6 +111,8 @@ export default function OrdersPage() {
       })
       setData(res.data.list)
       setTotal(res.data.total)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -249,12 +254,14 @@ export default function OrdersPage() {
           </>
         }
       >
+        <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />
         <Table
           rowKey="id"
           size="middle"
           dataSource={data}
           columns={columns}
           loading={loading}
+          locale={tableListLocale}
           scroll={{ x: 1100 }}
           rowSelection={{
             selectedRowKeys,
@@ -304,6 +311,7 @@ export default function OrdersPage() {
               )}
             </Descriptions>
             <Table size="small" style={{ marginTop: 0 }} pagination={false}
+              locale={tableListLocale}
               dataSource={detailOrder.items || []} rowKey="id"
               columns={[
                 {

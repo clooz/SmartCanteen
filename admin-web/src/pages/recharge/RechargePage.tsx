@@ -3,6 +3,7 @@ import { Table, Tag, Button, Modal, Image, Form, Input, Select, Space, message, 
 import { CheckOutlined, CloseOutlined, ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
+import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
 import { adminApi } from '../../api/admin'
 import dayjs from 'dayjs'
 
@@ -34,6 +35,8 @@ export default function RechargePage() {
   const [rechargeListFilterKey, setRechargeListFilterKey] = useState(0)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
 
   const resetRechargeFilters = () => {
     setFilterStatus(undefined)
@@ -72,6 +75,7 @@ export default function RechargePage() {
   const fetchData = async (p = 1, ps = pageSize) => {
     setLoading(true)
     setSelectedRowKeys([])
+    setLoadError(false)
     try {
       const res: any = await adminApi.getRecharges({
         page: p,
@@ -83,6 +87,8 @@ export default function RechargePage() {
       })
       setData(res.data.list)
       setTotal(res.data.total)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -100,12 +106,16 @@ export default function RechargePage() {
 
   const handleReview = async () => {
     const values = await form.validateFields()
+    setReviewSubmitting(true)
     try {
       await adminApi.reviewRecharge(reviewModal.id, { status: reviewAction, review_note: values.review_note || '' })
       message.success(reviewAction === 'completed' ? '已标记充值完成' : '已驳回申请')
       setReviewModal(null)
       fetchData(page, pageSize)
     } catch { /* 统一处理 */ }
+    finally {
+      setReviewSubmitting(false)
+    }
   }
 
   const statusOptions = Object.entries(STATUS_MAP).map(([value, { label }]) => ({ label, value }))
@@ -234,12 +244,14 @@ export default function RechargePage() {
           </>
         }
       >
+        <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />
         <Table
           rowKey="id"
           size="middle"
           dataSource={data}
           columns={columns}
           loading={loading}
+          locale={tableListLocale}
           scroll={{ x: 1200 }}
           rowSelection={{
             selectedRowKeys,
@@ -261,6 +273,7 @@ export default function RechargePage() {
         onOk={handleReview}
         onCancel={() => setReviewModal(null)}
         okText="确认"
+        confirmLoading={reviewSubmitting}
         okButtonProps={{ danger: reviewAction === 'rejected' }}
       >
         {reviewModal && (

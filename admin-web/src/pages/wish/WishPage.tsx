@@ -7,6 +7,7 @@ import { PlusOutlined, TrophyOutlined, LikeOutlined, ReloadOutlined, StopOutline
 import './WishPage.css'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
+import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
 import { wishApi } from '../../api/wish'
 import dayjs from 'dayjs'
 
@@ -35,6 +36,9 @@ export default function WishPage() {
   const [fItemCount, setFItemCount] = useState<number | undefined>()
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [editSubmitting, setEditSubmitting] = useState(false)
   const [commentMap, setCommentMap] = useState<Record<number, any[]>>({})
   const [commentLoadingSet, setCommentLoadingSet] = useState<Set<number>>(new Set())
 
@@ -58,10 +62,13 @@ export default function WishPage() {
   const fetchActivities = async () => {
     setLoading(true)
     setSelectedRowKeys([])
+    setLoadError(false)
     try {
       const res: any = await wishApi.getActivities()
       setActivities(res.data || [])
       setPage(1)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -128,6 +135,7 @@ export default function WishPage() {
 
   const handleCreate = async () => {
     const values = await form.validateFields()
+    setCreateSubmitting(true)
     try {
       await wishApi.createActivity({
         title: values.title,
@@ -139,6 +147,9 @@ export default function WishPage() {
       setCreateModal(false)
       fetchActivities()
     } catch { /* 统一处理 */ }
+    finally {
+      setCreateSubmitting(false)
+    }
   }
 
   const openEdit = (record: any) => {
@@ -154,6 +165,7 @@ export default function WishPage() {
     if (!editModal) return
     const activityId = editModal.id
     const values = await editForm.validateFields()
+    setEditSubmitting(true)
     try {
       await wishApi.updateActivity(activityId, {
         title: values.title,
@@ -169,6 +181,9 @@ export default function WishPage() {
         setItemsModal((prev: any) => (prev ? { ...prev, title: values.title } : null))
       }
     } catch { /* 统一处理 */ }
+    finally {
+      setEditSubmitting(false)
+    }
   }
 
   const handleClose = async (id: number) => {
@@ -366,12 +381,14 @@ export default function WishPage() {
           </>
         }
       >
+        <TableLoadErrorAlert error={loadError} onRetry={() => fetchActivities()} />
         <Table
           rowKey="id"
           size="middle"
           dataSource={pagedActivities}
           columns={activityColumns}
           loading={loading}
+          locale={tableListLocale}
           scroll={{ x: 1080 }}
           rowSelection={{
             selectedRowKeys,
@@ -386,7 +403,7 @@ export default function WishPage() {
         />
       </PageListShell>
 
-      <Modal title="发起许愿活动" open={createModal} destroyOnClose onOk={handleCreate} onCancel={() => setCreateModal(false)} okText="发起">
+      <Modal title="发起许愿活动" open={createModal} destroyOnClose onOk={handleCreate} onCancel={() => setCreateModal(false)} okText="发起" confirmLoading={createSubmitting}>
         <Form form={form} layout="vertical">
           <Form.Item name="title" label="活动标题" rules={[{ required: true }]}>
             <Input placeholder="如：五月许愿菜品征集" />
@@ -407,6 +424,7 @@ export default function WishPage() {
         onCancel={() => { setEditModal(null); editForm.resetFields() }}
         okText="保存"
         destroyOnClose
+        confirmLoading={editSubmitting}
       >
         <Form form={editForm} layout="vertical">
           <Form.Item name="title" label="活动标题" rules={[{ required: true }]}>

@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { dishesApi } from '../../api/dishes'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
+import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -38,12 +39,15 @@ export default function DishesPage() {
   const [dishToolbarKey, setDishToolbarKey] = useState(0)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [modalSubmitting, setModalSubmitting] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     (localStorage.getItem('dishViewMode') as ViewMode) || 'list'
   )
 
   const fetchData = async (p = page, ps = pageSize) => {
     setLoading(true)
+    setLoadError(false)
     try {
       const res: any = await dishesApi.getList({
         page: p, page_size: ps,
@@ -55,6 +59,8 @@ export default function DishesPage() {
       })
       setData(res.data.list)
       setTotal(res.data.total)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -106,6 +112,7 @@ export default function DishesPage() {
     formData.append('is_available', values.is_available ? '1' : '0')
     if (fileList[0]?.originFileObj) formData.append('image', fileList[0].originFileObj)
 
+    setModalSubmitting(true)
     try {
       if (editingId === null) {
         await dishesApi.create(formData)
@@ -117,6 +124,9 @@ export default function DishesPage() {
       setModalOpen(false)
       fetchData(editingId ? page : 1)
     } catch { /* 统一处理 */ }
+    finally {
+      setModalSubmitting(false)
+    }
   }
 
   const handleDelete = async (id: number) => {
@@ -180,7 +190,7 @@ export default function DishesPage() {
         v === 'yes' ? !!r.image_url : v === 'no' ? !r.image_url : true,
       render: (url: string) => url
         ? <Image src={url} width={48} height={48} style={{ borderRadius: 6, objectFit: 'cover', display: 'block', margin: '0 auto' }} />
-        : <div style={{ width: 48, height: 48, background: '#f0f0f0', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bfbfbf', fontSize: 20, margin: '0 auto' }}>🍽</div>,
+        : <div style={{ width: 48, height: 48, background: '#f0f0f0', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bfbfbf', fontSize: 18, margin: '0 auto' }}><PictureOutlined /></div>,
     },
     {
       title: '菜品名称', dataIndex: 'name',
@@ -425,6 +435,7 @@ export default function DishesPage() {
           </Space>
         }
       >
+        <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />
         {viewMode === 'list' ? (
           <Table
             rowKey="id"
@@ -432,6 +443,7 @@ export default function DishesPage() {
             dataSource={data}
             columns={columns}
             loading={loading}
+            locale={tableListLocale}
             scroll={{ x: 800 }}
             rowSelection={{
               selectedRowKeys,
@@ -487,6 +499,8 @@ export default function DishesPage() {
             <Button
               type="primary"
               onClick={handleSubmit}
+              loading={modalSubmitting}
+              disabled={modalSubmitting}
               icon={editingId ? <EditOutlined /> : <PlusOutlined />}
             >
               {editingId ? '保存修改' : '创建菜品'}

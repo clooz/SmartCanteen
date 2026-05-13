@@ -38,7 +38,7 @@ export default function PageListShell({
       }}
     >
       <div>
-        <Title level={4} style={{ margin: 0 }}>
+        <Title level={5} style={{ margin: 0 }}>
           {title}
         </Title>
         {subtitle ? (

@@ -3,6 +3,7 @@ import { Table, Button, Modal, Form, Input, InputNumber, message, Space, Typogra
 import { PlusOutlined, EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
+import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
 import { adminApi } from '../../api/admin'
 
 const { Text } = Typography
@@ -11,10 +12,12 @@ export default function CompaniesPage() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [modalSubmitting, setModalSubmitting] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form] = Form.useForm()
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [loadError, setLoadError] = useState(false)
 
   const [fCode, setFCode] = useState<string | undefined>()
   const [fName, setFName] = useState<string | undefined>()
@@ -36,10 +39,13 @@ export default function CompaniesPage() {
 
   const fetchData = async () => {
     setLoading(true)
+    setLoadError(false)
     try {
       const res: any = await adminApi.getCompanies()
       setData(res.data || [])
       setPage(1)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -65,6 +71,7 @@ export default function CompaniesPage() {
 
   const handleSubmit = async () => {
     const values = await form.validateFields()
+    setModalSubmitting(true)
     try {
       if (editingId === null) {
         await adminApi.createCompany(values)
@@ -76,6 +83,9 @@ export default function CompaniesPage() {
       setModalOpen(false)
       fetchData()
     } catch { /* 统一处理 */ }
+    finally {
+      setModalSubmitting(false)
+    }
   }
 
   const resetFilters = () => {
@@ -149,12 +159,14 @@ export default function CompaniesPage() {
           </>
         }
       >
+        <TableLoadErrorAlert error={loadError} onRetry={() => fetchData()} />
         <Table
           rowKey="id"
           size="middle"
           dataSource={pagedData}
           columns={columns}
           loading={loading}
+          locale={tableListLocale}
           pagination={standardTablePagination({
             current: page,
             total: filteredData.length,
@@ -165,7 +177,7 @@ export default function CompaniesPage() {
       </PageListShell>
 
       <Modal title={editingId ? '编辑公司' : '新增公司'} open={modalOpen} destroyOnClose
-        onOk={handleSubmit} onCancel={() => setModalOpen(false)} okText="保存">
+        onOk={handleSubmit} onCancel={() => setModalOpen(false)} okText="保存" confirmLoading={modalSubmitting}>
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="公司名称" rules={[{ required: true }]}>
             <Input />

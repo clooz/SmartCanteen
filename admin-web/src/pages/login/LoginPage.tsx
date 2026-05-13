@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Form, Input, Button, Typography } from 'antd'
 import { UserOutlined, LockOutlined, ControlOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -9,14 +10,18 @@ const { Text } = Typography
 export default function LoginPage() {
   const [form] = Form.useForm()
   const navigate = useNavigate()
+  const [submitting, setSubmitting] = useState(false)
 
   const handleLogin = async (values: { username: string; password: string }) => {
+    setSubmitting(true)
     try {
       const res: any = await authApi.login(values)
       authStore.setAuth(res.data.token, res.data.user)
       navigate('/', { replace: true })
     } catch {
       // 错误已在拦截器统一处理
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -57,7 +62,7 @@ export default function LoginPage() {
             />
           </Form.Item>
           <Form.Item style={{ marginBottom: 0 }}>
-            <Button type="primary" htmlType="submit" block className="login-shell__submit">
+            <Button type="primary" htmlType="submit" block className="login-shell__submit" loading={submitting} disabled={submitting}>
               登 录
             </Button>
           </Form.Item>

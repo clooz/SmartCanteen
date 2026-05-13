@@ -11,6 +11,7 @@ import {
   EditOutlined, EyeOutlined, MoreOutlined, PlayCircleOutlined,
 } from '@ant-design/icons'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
+import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
 import { menusApi } from '../../api/menus'
 import { dishesApi } from '../../api/dishes'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
@@ -66,6 +67,8 @@ export default function MenusPage() {
 
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [menuModalSubmitting, setMenuModalSubmitting] = useState(false)
 
   const [globalOrdering, setGlobalOrdering] = useState<any>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -89,6 +92,7 @@ export default function MenusPage() {
   const fetchData = async (p = page, ps = pageSize) => {
     setLoading(true)
     setSelectedRowKeys([])
+    setLoadError(false)
     try {
       const res: any = await menusApi.getList({
         page: p,
@@ -99,6 +103,8 @@ export default function MenusPage() {
       })
       setData(res.data.list)
       setTotal(res.data.total)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -176,6 +182,7 @@ export default function MenusPage() {
     if (breakfastDishIds.length + lunchDishIds.length === 0) {
       return message.error('请至少为早餐或午餐选择一道菜品')
     }
+    setMenuModalSubmitting(true)
     try {
       await menusApi.createOrUpdate({
         menu_date: selectedDate.format('YYYY-MM-DD'),
@@ -193,6 +200,9 @@ export default function MenusPage() {
       setModalOpen(false)
       fetchData(page, pageSize)
     } catch { /* 统一处理 */ }
+    finally {
+      setMenuModalSubmitting(false)
+    }
   }
 
   const handleStatusChange = async (id: number, status: string) => {
@@ -697,6 +707,7 @@ export default function MenusPage() {
           </>
         }
       >
+        <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />
         <Table
           rowKey="id"
           size="middle"
@@ -705,6 +716,7 @@ export default function MenusPage() {
           dataSource={data}
           columns={columns}
           loading={loading}
+          locale={tableListLocale}
           rowSelection={{
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys as number[]),
@@ -756,6 +768,7 @@ export default function MenusPage() {
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
         okText="保存"
+        confirmLoading={menuModalSubmitting}
       >
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <div>
@@ -900,6 +913,7 @@ export default function MenusPage() {
             <Table
               size="small"
               style={{ marginTop: 0 }}
+              locale={tableListLocale}
               dataSource={detailModal.dishes || []}
               rowKey={(r: any) => String(r.menu_dish_id ?? `${r.id}-${r.meal_type || 'lunch'}`)}
               pagination={false}

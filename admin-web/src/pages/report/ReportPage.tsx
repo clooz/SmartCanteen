@@ -3,6 +3,7 @@ import { Card, Table, DatePicker, Button, Row, Col, Statistic, Typography, Tag, 
 import { BarChartOutlined, TeamOutlined, FireOutlined, ReloadOutlined } from '@ant-design/icons'
 import PageListShell from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
+import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
 import { ordersApi } from '../../api/orders'
 import { authApi } from '../../api/auth'
 import dayjs, { Dayjs } from 'dayjs'
@@ -18,6 +19,7 @@ export default function ReportPage() {
   const [companies, setCompanies] = useState<any[]>([])
   const [filterCompany, setFilterCompany] = useState<number>()
   const [reportData, setReportData] = useState<any>(null)
+  const [loadError, setLoadError] = useState(false)
 
   const fetchCompanies = async () => {
     const res: any = await authApi.getCompanies()
@@ -31,6 +33,7 @@ export default function ReportPage() {
   const fetchReport = async () => {
     if (!dateRange) return
     setLoading(true)
+    setLoadError(false)
     try {
       const res: any = await ordersApi.getReport({
         start_date: dateRange[0].format('YYYY-MM-DD'),
@@ -38,6 +41,8 @@ export default function ReportPage() {
         company_id: filterCompany,
       })
       setReportData(res.data)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -156,6 +161,7 @@ export default function ReportPage() {
           </Space>
         }
       >
+        <TableLoadErrorAlert error={loadError} onRetry={fetchReport} />
         {!reportData ? (
           <div style={{ padding: '40px 0 48px' }}>
             <Empty description={<Text type="secondary">选择日期范围与公司后点击「查询」查看报表</Text>} />
@@ -187,6 +193,7 @@ export default function ReportPage() {
                 <Card title={<Space><TeamOutlined /> 按公司汇总</Space>} style={{ marginBottom: 16 }}>
                   <Table size="small" pagination={false} dataSource={reportData.by_company} rowKey="company_code"
                     columns={companyColumns}
+                    locale={tableListLocale}
                   />
                 </Card>
               </Col>
@@ -194,6 +201,7 @@ export default function ReportPage() {
                 <Card title={<Space><FireOutlined /> 热销菜品 TOP10</Space>}>
                   <Table size="small" pagination={false} dataSource={reportData.top_dishes} rowKey="dish_name"
                     columns={topDishColumns}
+                    locale={tableListLocale}
                   />
                 </Card>
               </Col>
@@ -202,6 +210,7 @@ export default function ReportPage() {
             <Card title="按日期趋势" style={{ marginTop: 0 }}>
               <Table size="small" pagination={false} dataSource={reportData.by_date} rowKey="date"
                 columns={dateTrendColumns}
+                locale={tableListLocale}
               />
             </Card>
           </div>

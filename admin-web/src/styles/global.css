@@ -8,6 +8,54 @@ html, body, #root {
   height: 100%;
 }
 
+/* 亮/暗主题切换：View Transitions + 按方向二选一
+   - 切到深色：新画面从点击点圆形扩散（expand）
+   - 切到浅色：旧深色画面向点击点圆形收缩（shrink，旧层在上） */
+html {
+  view-transition-name: root;
+}
+
+@keyframes theme-reveal-expand-new {
+  from {
+    clip-path: circle(0px at var(--theme-reveal-x, 50%) var(--theme-reveal-y, 50%));
+  }
+  to {
+    clip-path: circle(150vmax at var(--theme-reveal-x, 50%) var(--theme-reveal-y, 50%));
+  }
+}
+
+@keyframes theme-reveal-shrink-old {
+  from {
+    clip-path: circle(150vmax at var(--theme-reveal-x, 50%) var(--theme-reveal-y, 50%));
+  }
+  to {
+    clip-path: circle(0px at var(--theme-reveal-x, 50%) var(--theme-reveal-y, 50%));
+  }
+}
+
+/* 浅色 → 深色：新（暗）在上，圆形扩散盖住旧（亮）
+   注意：「]」与「::」之间不能有空格，否则选不到 view-transition 伪元素 */
+html[data-theme-reveal="expand"]::view-transition-new(root) {
+  z-index: 2;
+  animation: theme-reveal-expand-new 0.48s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+html[data-theme-reveal="expand"]::view-transition-old(root) {
+  z-index: 1;
+  animation: none;
+}
+
+/* 深色 → 浅色：旧（暗）在上，圆形收缩露出下层新（亮） */
+html[data-theme-reveal="shrink"]::view-transition-old(root) {
+  z-index: 2;
+  animation: theme-reveal-shrink-old 0.48s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+html[data-theme-reveal="shrink"]::view-transition-new(root) {
+  z-index: 1;
+  animation: none;
+}
+
 /* ── 字体渲染优化 ── */
 * {
   -webkit-font-smoothing: antialiased;
@@ -322,6 +370,12 @@ h1.ant-typography, h2.ant-typography, h3.ant-typography, h4.ant-typography {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 /* ── Login 页面（轻盈现代化） ── */
@@ -439,4 +493,101 @@ h1.ant-typography, h2.ant-typography, h3.ant-typography, h4.ant-typography {
   .login-card__header h1 {
     font-size: 30px;
   }
+}
+
+/* ── 深色模式：与 data-theme=dark 对齐（与 App.tsx darkAlgorithm 配套） ── */
+[data-theme="dark"] .ant-table-tbody > tr > td {
+  border-bottom-color: #303030 !important;
+}
+[data-theme="dark"] .ant-card {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.48) !important;
+  border-color: #303030 !important;
+}
+[data-theme="dark"] .ant-card:hover {
+  box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.55) !important;
+}
+[data-theme="dark"] .ant-card-head {
+  border-bottom-color: #303030 !important;
+}
+[data-theme="dark"] .ant-modal-header {
+  border-bottom-color: #303030 !important;
+  background: #141414 !important;
+}
+[data-theme="dark"] .ant-modal-title {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+[data-theme="dark"] .ant-modal-footer {
+  border-top-color: #303030 !important;
+  background: #1a1a1a !important;
+}
+[data-theme="dark"] h1.ant-typography,
+[data-theme="dark"] h2.ant-typography,
+[data-theme="dark"] h3.ant-typography,
+[data-theme="dark"] h4.ant-typography {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+[data-theme="dark"] .ant-statistic-title {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+[data-theme="dark"] .ant-form-item-label > label {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+[data-theme="dark"] .page-header-title {
+  color: rgba(255, 255, 255, 0.88);
+}
+[data-theme="dark"] .page-header-subtitle {
+  color: rgba(255, 255, 255, 0.45);
+}
+[data-theme="dark"] .stat-card {
+  background: #141414;
+  border-color: #303030;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.45);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #434343;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #595959;
+}
+[data-theme="dark"] .ant-btn-primary.ant-btn-disabled,
+[data-theme="dark"] .ant-btn-primary:disabled {
+  color: rgba(255, 255, 255, 0.25) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: #424242 !important;
+}
+[data-theme="dark"] .login-page {
+  background: #0a0a0a;
+}
+[data-theme="dark"] .login-page__bg--one {
+  background:
+    radial-gradient(1200px 300px at 85% 22%, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0) 72%),
+    radial-gradient(1000px 260px at 15% 80%, rgba(99, 102, 241, 0.16) 0%, rgba(99, 102, 241, 0) 76%);
+}
+[data-theme="dark"] .login-card {
+  background: rgba(20, 20, 20, 0.92);
+  border-color: #303030;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+[data-theme="dark"] .login-card__logo {
+  background: rgba(22, 119, 255, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #69b1ff;
+}
+[data-theme="dark"] .login-card__header h1 {
+  color: rgba(255, 255, 255, 0.92);
+}
+[data-theme="dark"] .login-card__header .ant-typography {
+  color: rgba(255, 255, 255, 0.45);
+}
+[data-theme="dark"] .login-shell__label {
+  color: rgba(255, 255, 255, 0.65);
+}
+[data-theme="dark"] .login-shell__input {
+  border-color: #424242;
+}
+[data-theme="dark"] .login-shell__input-icon {
+  color: rgba(255, 255, 255, 0.35);
+}
+[data-theme="dark"] .login-shell__footer .ant-typography {
+  color: rgba(255, 255, 255, 0.35);
 }

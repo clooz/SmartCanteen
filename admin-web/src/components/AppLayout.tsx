@@ -1,22 +1,23 @@
 import { useState } from 'react'
-import { Layout, Menu, Avatar, Dropdown, Typography, Button, theme, Tooltip, Breadcrumb } from 'antd'
+import {
+  Layout, Menu, Avatar, Dropdown, Button, theme, Tooltip, Breadcrumb, Drawer, Grid,
+} from 'antd'
 import {
   ShopOutlined, CalendarOutlined, UnorderedListOutlined,
   BarChartOutlined, TeamOutlined, BankOutlined, WalletOutlined,
   StarOutlined, LogoutOutlined, UserOutlined, CoffeeOutlined,
   SunOutlined, MoonOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  DownOutlined, HomeOutlined, ControlOutlined,
+  DownOutlined, HomeOutlined, ControlOutlined, MenuOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { authStore } from '../store/authStore'
-import type { ThemeMode } from '../App'
+import type { ThemeMode, ThemeToggleOrigin } from '../App'
 
 const { Sider, Header, Content } = Layout
-const { Text } = Typography
 
 interface Props {
   themeMode: ThemeMode
-  onToggleTheme: () => void
+  onToggleTheme: (origin?: ThemeToggleOrigin) => void
 }
 
 const adminMenuItems = [
@@ -42,17 +43,16 @@ const chefMenuItems = [
 
 export default function AppLayout({ themeMode, onToggleTheme }: Props) {
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const screens = Grid.useBreakpoint()
   const { token } = theme.useToken()
   const user = authStore.getUser()
   const isAdmin = user?.role === 'admin'
   const menuItems = isAdmin ? adminMenuItems : chefMenuItems
   const isDark = themeMode === 'dark'
-
-  const currentPage = [...adminMenuItems, ...chefMenuItems].find(
-    item => item.key === location.pathname
-  )
+  const isCompactNav = screens.lg === false
 
   const handleLogout = () => {
     authStore.clear()
@@ -68,150 +68,163 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
     },
   }
 
-  // 侧边栏背景色
   const siderBg = isDark ? '#141414' : '#ffffff'
   const siderBorder = isDark ? '#2a2a2a' : '#EEF2F7'
 
-  return (
-    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
-      {/* ── 侧边栏 ── */}
-      <Sider
-        collapsed={collapsed}
-        trigger={null}
-        width={220}
-        collapsedWidth={64}
-        style={{
-          background: siderBg,
-          borderRight: `1px solid ${siderBorder}`,
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
-          overflow: 'hidden',
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
+  const closeMobileMenu = () => setMobileMenuOpen(false)
+
+  const menu = (
+    <Menu
+      mode="inline"
+      selectedKeys={[location.pathname]}
+      items={menuItems}
+      onClick={({ key }) => {
+        navigate(key)
+        closeMobileMenu()
+      }}
+      style={{ border: 'none', background: 'transparent' }}
+    />
+  )
+
+  const siderBody = (
+    <>
+      <div style={{
+        height: 60,
+        display: 'flex',
+        alignItems: 'center',
+        padding: collapsed ? '0' : '0 16px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        gap: 10,
+        borderBottom: `1px solid ${siderBorder}`,
+        flexShrink: 0,
+      }}
       >
-        {/* Logo 区 */}
         <div style={{
-          height: 60,
+          width: 32, height: 32,
+          borderRadius: 9,
+          background: 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: '0 2px 8px rgba(22,119,255,0.35)',
+        }}
+        >
+          <ControlOutlined style={{ color: '#fff', fontSize: 15 }} />
+        </div>
+        {!collapsed && (
+          <div>
+            <div style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: token.colorText,
+              lineHeight: 1.2,
+              letterSpacing: '-0.01em',
+              whiteSpace: 'nowrap',
+            }}
+            >
+              智能食堂
+            </div>
+            <div style={{
+              fontSize: 11,
+              color: token.colorTextTertiary,
+              lineHeight: 1.4,
+              whiteSpace: 'nowrap',
+            }}
+            >
+              管理控制台
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        padding: '8px 0',
+        paddingBottom: 56,
+      }}
+      >
+        {!collapsed && (
+          <div style={{
+            padding: '4px 20px 6px',
+            fontSize: 10.5,
+            fontWeight: 600,
+            color: token.colorTextQuaternary,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+          }}
+          >
+            {isAdmin ? '功能导航' : '操作台'}
+          </div>
+        )}
+        {menu}
+      </div>
+
+      <Button
+        type="text"
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? '展开侧栏' : '收起侧栏'}
+        onClick={() => setCollapsed(c => !c)}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 48,
+          borderRadius: 0,
+          borderTop: `1px solid ${siderBorder}`,
+          color: token.colorTextTertiary,
+          fontSize: 12,
+          gap: 6,
           display: 'flex',
           alignItems: 'center',
-          padding: collapsed ? '0' : '0 16px',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          gap: 10,
-          borderBottom: `1px solid ${siderBorder}`,
-          flexShrink: 0,
-        }}>
-          <div style={{
-            width: 32, height: 32,
-            borderRadius: 9,
-            background: 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-            boxShadow: '0 2px 8px rgba(22,119,255,0.35)',
-          }}>
-            <ControlOutlined style={{ color: '#fff', fontSize: 15 }} />
-          </div>
-          {!collapsed && (
-            <div>
-              <div style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: token.colorText,
-                lineHeight: 1.2,
-                letterSpacing: '-0.01em',
-                whiteSpace: 'nowrap',
-              }}>
-                智能食堂
-              </div>
-              <div style={{
-                fontSize: 11,
-                color: token.colorTextTertiary,
-                lineHeight: 1.4,
-                whiteSpace: 'nowrap',
-              }}>
-                管理控制台
-              </div>
-            </div>
-          )}
-        </div>
+          justifyContent: 'center',
+        }}
+      >
+        {collapsed
+          ? <MenuUnfoldOutlined style={{ fontSize: 14 }} />
+          : <><MenuFoldOutlined style={{ fontSize: 14 }} /><span style={{ fontWeight: 500 }}>收起</span></>}
+      </Button>
+    </>
+  )
 
-        {/* 导航菜单 */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          padding: '8px 0',
-          paddingBottom: 56,
-        }}>
-          {!collapsed && (
-            <div style={{
-              padding: '4px 20px 6px',
-              fontSize: 10.5,
-              fontWeight: 600,
-              color: token.colorTextQuaternary,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-            }}>
-              {isAdmin ? '功能导航' : '操作台'}
-            </div>
-          )}
-          <Menu
-            mode="inline"
-            selectedKeys={[location.pathname]}
-            items={menuItems}
-            onClick={({ key }) => navigate(key)}
-            style={{ border: 'none', background: 'transparent' }}
-          />
-        </div>
+  const contentPadding = isCompactNav ? 16 : 24
 
-        {/* 收起按钮 */}
-        <div
-          onClick={() => setCollapsed(!collapsed)}
+  return (
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+      {!isCompactNav && (
+        <Sider
+          collapsed={collapsed}
+          trigger={null}
+          width={220}
+          collapsedWidth={64}
           style={{
-            position: 'absolute',
-            bottom: 0, left: 0, right: 0,
-            height: 48,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            borderTop: `1px solid ${siderBorder}`,
-            color: token.colorTextTertiary,
-            fontSize: 12,
-            gap: 6,
-            userSelect: 'none',
-            transition: 'color 0.2s, background 0.2s',
             background: siderBg,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.color = token.colorPrimary
-            e.currentTarget.style.background = token.colorPrimaryBg
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.color = token.colorTextTertiary
-            e.currentTarget.style.background = siderBg
+            borderRight: `1px solid ${siderBorder}`,
+            position: 'sticky',
+            top: 0,
+            height: '100vh',
+            overflow: 'hidden',
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          {collapsed
-            ? <MenuUnfoldOutlined style={{ fontSize: 14 }} />
-            : <><MenuFoldOutlined style={{ fontSize: 14 }} /><span style={{ fontWeight: 500 }}>收起</span></>
-          }
-        </div>
-      </Sider>
+          {siderBody}
+        </Sider>
+      )}
 
-      {/* ── 右侧主区域 ── */}
       <Layout style={{
         background: token.colorBgLayout,
         overflow: 'auto',
         flex: 1,
-      }}>
-        {/* 顶部导航栏 */}
+        minWidth: 0,
+      }}
+      >
         <Header style={{
           background: token.colorBgContainer,
           borderBottom: `1px solid ${isDark ? '#2a2a2a' : '#EEF2F7'}`,
-          padding: '0 24px',
+          padding: `0 ${contentPadding}px`,
           height: 60,
           lineHeight: '60px',
           display: 'flex',
@@ -221,25 +234,51 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
           top: 0,
           zIndex: 10,
           boxShadow: 'none',
-        }}>
-          {/* 左侧面包屑 + 页面标题 */}
-          <div>
+        }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            {isCompactNav && (
+              <Tooltip title="打开菜单">
+                <Button
+                  type="text"
+                  icon={<MenuOutlined />}
+                  aria-label="打开菜单"
+                  onClick={() => setMobileMenuOpen(true)}
+                  style={{ color: token.colorTextSecondary, flexShrink: 0 }}
+                />
+              </Tooltip>
+            )}
             <Breadcrumb
               items={[
-                { href: '/', title: <HomeOutlined style={{ fontSize: 12 }} /> },
-                { title: <span style={{ fontSize: 12, color: token.colorText, fontWeight: 500 }}>{currentPage?.label || '控制台'}</span> },
+                {
+                  title: (
+                    <Tooltip title="首页">
+                      <a
+                        href="/"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          navigate('/')
+                        }}
+                        aria-label="返回首页"
+                        style={{ color: token.colorTextSecondary, display: 'inline-flex', alignItems: 'center' }}
+                      >
+                        <HomeOutlined style={{ fontSize: 14 }} />
+                      </a>
+                    </Tooltip>
+                  ),
+                },
               ]}
-              style={{ lineHeight: 1, marginBottom: 2 }}
+              style={{ lineHeight: 1 }}
             />
           </div>
 
-          {/* 右侧操作区 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <Tooltip title={themeMode === 'light' ? '深色模式' : '浅色模式'}>
               <Button
                 type="text"
                 icon={themeMode === 'light' ? <MoonOutlined /> : <SunOutlined />}
-                onClick={onToggleTheme}
+                onClick={(e) => onToggleTheme({ clientX: e.clientX, clientY: e.clientY })}
+                aria-label={themeMode === 'light' ? '切换到深色模式' : '切换到浅色模式'}
                 style={{
                   color: token.colorTextSecondary,
                   borderRadius: 8,
@@ -249,19 +288,18 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
 
             <div style={{ width: 1, height: 20, background: token.colorBorderSecondary, margin: '0 4px' }} />
 
-            <Dropdown menu={userDropdown} placement="bottomRight">
-              <div
+            <Dropdown menu={userDropdown} placement="bottomRight" trigger={['click']}>
+              <Button
+                type="text"
+                aria-haspopup="menu"
                 style={{
+                  height: 'auto',
+                  padding: '4px 8px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  cursor: 'pointer',
-                  padding: '5px 10px 5px 6px',
                   borderRadius: 8,
-                  transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = token.colorFillTertiary)}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <Avatar
                   size={28}
@@ -269,7 +307,7 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
                   src={user?.avatar || undefined}
                   style={{ background: token.colorPrimary, flexShrink: 0, fontSize: 12 }}
                 />
-                <div style={{ lineHeight: 1.4 }}>
+                <div style={{ lineHeight: 1.4, textAlign: 'left' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: token.colorText, whiteSpace: 'nowrap' }}>
                     {user?.nickname || user?.username}
                   </div>
@@ -278,16 +316,28 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
                   </div>
                 </div>
                 <DownOutlined style={{ fontSize: 10, color: token.colorTextQuaternary }} />
-              </div>
+              </Button>
             </Dropdown>
           </div>
         </Header>
 
-        {/* 内容区 */}
-        <Content style={{ padding: 24, minHeight: 0 }}>
+        <Content style={{ padding: contentPadding, minHeight: 0 }}>
           <Outlet />
         </Content>
       </Layout>
+
+      <Drawer
+        title={(
+          <span style={{ fontWeight: 600, color: token.colorText }}>智能食堂</span>
+        )}
+        placement="left"
+        width={260}
+        onClose={closeMobileMenu}
+        open={isCompactNav && mobileMenuOpen}
+        styles={{ body: { padding: '8px 0' } }}
+      >
+        {menu}
+      </Drawer>
     </Layout>
   )
 }

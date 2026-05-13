@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
+import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
 import { adminApi } from '../../api/admin'
 import dayjs from 'dayjs'
 
@@ -75,10 +76,14 @@ export default function UsersPage() {
   const [listFilterKey, setListFilterKey] = useState(0)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [userModalSubmitting, setUserModalSubmitting] = useState(false)
+  const [pwdModalSubmitting, setPwdModalSubmitting] = useState(false)
 
   const fetchData = async (p = page, ps = pageSize) => {
     setLoading(true)
     setSelectedRowKeys([])
+    setLoadError(false)
     try {
       const res: any = await adminApi.getUsers({
         page: p,
@@ -92,6 +97,8 @@ export default function UsersPage() {
       })
       setData(res.data.list)
       setTotal(res.data.total)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -167,6 +174,7 @@ export default function UsersPage() {
 
   const handleSubmit = async () => {
     const values = await form.validateFields()
+    setUserModalSubmitting(true)
     try {
       if (editingId === null) {
         await adminApi.createUser(values)
@@ -178,6 +186,9 @@ export default function UsersPage() {
       setModalOpen(false)
       fetchData(page, pageSize)
     } catch { /* 统一处理 */ }
+    finally {
+      setUserModalSubmitting(false)
+    }
   }
 
   const handleSyncUsers = async () => {
@@ -205,11 +216,15 @@ export default function UsersPage() {
 
   const handleResetPwd = async () => {
     const values = await pwdForm.validateFields()
+    setPwdModalSubmitting(true)
     try {
       await adminApi.resetPassword(editingId!, values)
       message.success('密码重置成功')
       setPwdModalOpen(false)
     } catch { /* 统一处理 */ }
+    finally {
+      setPwdModalSubmitting(false)
+    }
   }
 
   const roleOptions = Object.entries(ROLE_MAP).map(([value, { label }]) => ({ label, value }))
@@ -393,12 +408,14 @@ export default function UsersPage() {
           </>
         }
       >
+        <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />
         <Table
           rowKey="id"
           size="middle"
           dataSource={data}
           columns={columns}
           loading={loading}
+          locale={tableListLocale}
           scroll={{ x: 900 }}
           rowSelection={{
             selectedRowKeys,
@@ -414,7 +431,7 @@ export default function UsersPage() {
       </PageListShell>
 
       <Modal title={editingId ? '编辑用户' : '新增用户'} open={modalOpen} destroyOnClose
-        onOk={handleSubmit} onCancel={() => setModalOpen(false)} okText="保存">
+        onOk={handleSubmit} onCancel={() => setModalOpen(false)} okText="保存" confirmLoading={userModalSubmitting}>
         <Form form={form} layout="vertical">
           {!editingId && (
             <>
@@ -488,7 +505,7 @@ export default function UsersPage() {
       </Modal>
 
       <Modal title="重置密码" open={pwdModalOpen} destroyOnClose
-        onOk={handleResetPwd} onCancel={() => setPwdModalOpen(false)} okText="确认重置">
+        onOk={handleResetPwd} onCancel={() => setPwdModalOpen(false)} okText="确认重置" confirmLoading={pwdModalSubmitting}>
         <Form form={pwdForm} layout="vertical">
           <Form.Item name="new_password" label="新密码" rules={[{ required: true, min: 6, message: '密码不少于6位' }]}>
             <Input.Password />

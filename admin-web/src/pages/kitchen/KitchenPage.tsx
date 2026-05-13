@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { Card, Badge, Button, Tag, Empty, Typography, Space, Divider, message, theme } from 'antd'
 import { CheckOutlined, ClockCircleOutlined, BellOutlined, ReloadOutlined } from '@ant-design/icons'
 import PageListShell from '../../components/PageListShell'
+import { TableLoadErrorAlert } from '../../utils/tableListLocale'
 import { io, Socket } from 'socket.io-client'
 import { ordersApi } from '../../api/orders'
 import dayjs from 'dayjs'
@@ -31,11 +32,13 @@ interface Order {
 export default function KitchenPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const socketRef = useRef<Socket | null>(null)
   const { token } = theme.useToken()
 
   const fetchOrders = async () => {
     setLoading(true)
+    setLoadError(false)
     try {
       const [r1, r2, r3]: any[] = await Promise.all([
         ordersApi.getAll({ status: 'pending', page_size: 50 }),
@@ -47,6 +50,8 @@ export default function KitchenPage() {
         ...(r2.data?.list || []),
         ...(r3.data?.list || []),
       ])
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -233,8 +238,9 @@ export default function KitchenPage() {
         </Button>
       }
     >
+      <TableLoadErrorAlert error={loadError} onRetry={fetchOrders} />
       {/* 看板列 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: 16 }}>
         {COLUMN_CONFIG.map(col => {
           const colOrders = groupedOrders[col.status as keyof typeof groupedOrders]
           return (
