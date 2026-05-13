@@ -1,9 +1,12 @@
 const api = require('../../utils/api')
 const { getToken } = require('../../utils/storage')
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
 Page({
   data: {
     loading: false,
+    refreshing: false,
     hasMenu: false,
     breakfastDishes: [],
     lunchDishes: [],
@@ -12,11 +15,19 @@ Page({
 
   onLoad() {
     this.setTodayStr()
-    this.checkLoginAndLoad()
   },
 
   onShow() {
     this.checkLoginAndLoad()
+    this.startAutoRefresh()
+  },
+
+  onHide() {
+    this.stopAutoRefresh()
+  },
+
+  onUnload() {
+    this.stopAutoRefresh()
   },
 
   onPullDownRefresh() {
@@ -32,19 +43,45 @@ Page({
 
   checkLoginAndLoad() {
     if (!getToken()) {
+      this.stopAutoRefresh()
       wx.reLaunch({ url: '/pages/login/login' })
       return
     }
     this.loadMenu()
   },
 
-  async loadMenu() {
-    this.setData({ loading: true })
+  startAutoRefresh() {
+    this.stopAutoRefresh()
+    this.refreshTimer = setInterval(() => {
+      if (getToken()) {
+        this.loadMenu({ silent: true })
+      }
+    }, 15000)
+  },
+
+  stopAutoRefresh() {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer)
+      this.refreshTimer = null
+    }
+  },
+
+  async loadMenu(options = {}) {
+    const { silent = false, manual = false } = options
+    const refreshStartedAt = Date.now()
+    if (!silent) this.setData({ loading: true })
+    if (manual) {
+      this.setData({ refreshing: true })
+      wx.showLoading({ title: '刷新中...', mask: false })
+    }
     try {
-      const res = await api.getTodayMenu()
+      const res = await api.getTodayMenu({ _t: Date.now() })
       const menu = res.data
       if (!menu) {
         this.setData({ hasMenu: false, breakfastDishes: [], lunchDishes: [] })
+        if (manual) {
+          wx.showToast({ title: '已刷新，暂无菜单', icon: 'none', duration: 1200 })
+        }
         return
       }
 
@@ -59,14 +96,26 @@ Page({
 
       const hasMenu = breakfastDishes.length > 0 || lunchDishes.length > 0
       this.setData({ hasMenu, breakfastDishes, lunchDishes })
+      if (manual) {
+        wx.showToast({ title: '已刷新', icon: 'success', duration: 900 })
+      }
     } catch {
       this.setData({ hasMenu: false })
     } finally {
-      this.setData({ loading: false })
+      if (manual) {
+        const remain = 600 - (Date.now() - refreshStartedAt)
+        if (remain > 0) await sleep(remain)
+      }
+      if (!silent) this.setData({ loading: false })
+      if (manual) {
+        wx.hideLoading()
+        this.setData({ refreshing: false })
+      }
     }
   },
 
   onRefresh() {
-    this.loadMenu()
+    if (this.data.refreshing || this.data.loading) return
+    this.loadMenu({ manual: true, silent: this.data.hasMenu })
   },
 })

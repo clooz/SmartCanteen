@@ -5,8 +5,9 @@
       <view class="header-date">{{todayStr}}</view>
       <view class="header-title">今日菜单</view>
     </view>
-    <view class="header-refresh" bindtap="onRefresh">
-      <van-icon name="replay" size="40rpx" color="#fff" />
+    <view class="header-refresh {{refreshing ? 'is-refreshing' : ''}}" bindtap="onRefresh">
+      <van-loading wx:if="{{refreshing}}" type="spinner" size="36rpx" color="#fff" />
+      <van-icon wx:else name="replay" size="40rpx" color="#fff" />
     </view>
   </view>
 

@@ -198,6 +198,15 @@ async function migrateSchema() {
       'ALTER TABLE menu_dishes ADD UNIQUE KEY uk_menu_dish_meal (menu_id, dish_id, meal_type)'
     );
   }
+  const [menuDishOldIdx] = await pool.query(
+    `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'menu_dishes' AND INDEX_NAME = 'uk_menu_dish'`
+  );
+  if (menuDishOldIdx.length) {
+    console.log('🔄 迁移：menu_dishes 移除旧唯一索引 uk_menu_dish …');
+    await pool.query('ALTER TABLE menu_dishes DROP INDEX uk_menu_dish');
+    console.log('   ✅ 已允许同一道菜同时配置为不同餐次');
+  }
 
   const ordRows = await pool.query(
     `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS

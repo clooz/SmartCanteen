@@ -8,7 +8,7 @@ import type { MenuProps } from 'antd'
 import {
   PlusOutlined, ReloadOutlined,
   CheckCircleOutlined, StopOutlined, DeleteOutlined,
-  EditOutlined, EyeOutlined, MoreOutlined, PlayCircleOutlined,
+  EditOutlined, EyeOutlined, MoreOutlined, PlayCircleOutlined, InfoCircleOutlined,
 } from '@ant-design/icons'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
@@ -63,6 +63,7 @@ export default function MenusPage() {
   const [breakfastDishIds, setBreakfastDishIds] = useState<string[]>([])
   const [lunchDishIds, setLunchDishIds] = useState<string[]>([])
   const [editingMenuId, setEditingMenuId] = useState<number | null>(null)
+  const [editingStatus, setEditingStatus] = useState<string>('draft')
   const [detailModal, setDetailModal] = useState<any>(null)
 
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
@@ -135,6 +136,7 @@ export default function MenusPage() {
 
   const openCreate = () => {
     setEditingMenuId(null)
+    setEditingStatus('draft')
     setSelectedDate(dayjs())
     setBreakfastDishIds([])
     setLunchDishIds([])
@@ -157,6 +159,7 @@ export default function MenusPage() {
         return
       }
       setEditingMenuId(record.id)
+      setEditingStatus(record.status || 'draft')
       setSelectedDate(dayjs(record.menu_date))
       const dishes = res.data.dishes || []
       setBreakfastDishIds(
@@ -188,7 +191,7 @@ export default function MenusPage() {
         menu_date: selectedDate.format('YYYY-MM-DD'),
         breakfast_dish_ids: breakfastDishIds.map(Number),
         lunch_dish_ids: lunchDishIds.map(Number),
-        status: 'draft',
+        status: editingMenuId === null ? 'draft' : editingStatus,
         breakfast_order_start: fmtSubmitTime(bfOrdStart),
         breakfast_order_end: fmtSubmitTime(bfOrdEnd),
         lunch_order_start: fmtSubmitTime(luOrdStart),
@@ -707,6 +710,21 @@ export default function MenusPage() {
           </>
         }
       >
+        <div
+          style={{
+            marginBottom: 10,
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: '1px solid #bae0ff',
+            background: '#e6f4ff',
+            color: '#0958d9',
+            fontSize: 13,
+            lineHeight: 1.6,
+          }}
+        >
+          <InfoCircleOutlined style={{ marginRight: 6 }} />
+          厨师可以提前把未来一周菜单保存为草稿；系统会在菜单当天自动发布，第二天自动关闭。需要临时停用时，点“关闭”即可。
+        </div>
         <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />
         <Table
           rowKey="id"

@@ -130,7 +130,7 @@ const api = {
   changePassword: (data) => api.put('/auth/change-password', data),
 
   // ── Menu ──
-  getTodayMenu: () => api.get('/menus/today'),
+  getTodayMenu: (data) => api.get('/menus/today', data),
 
   // ── Wish ──
   getWishActivities:    ()         => api.get('/wish/activities'),

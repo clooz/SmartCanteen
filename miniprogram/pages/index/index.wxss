@@ -40,6 +40,14 @@
   flex-shrink: 0;
 }
 .header-refresh:active { background: rgba(255,255,255,0.25); }
+.header-refresh.is-refreshing {
+  background: rgba(255,255,255,0.28);
+  animation: refreshSpin 0.8s linear infinite;
+}
+@keyframes refreshSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
 /* ===== 加载状态 ===== */
 .loading-wrap {
