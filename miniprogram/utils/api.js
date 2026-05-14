@@ -36,7 +36,7 @@ function request(method, path, data = {}) {
           return
         }
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          if (res.data && res.data.success === false) {
+          if (res.data && (res.data.success === false || res.data.code === 1)) {
             wx.showToast({ title: res.data.message || '操作失败', icon: 'none', duration: 2000 })
             reject(new Error(res.data.message))
           } else {
@@ -121,9 +121,16 @@ const api = {
   upload: (path, file, form, fileField) => upload(path, file, form || {}, fileField),
 
   // ── Auth ──
-  getCompanies:   ()     => api.get('/auth/companies'),
+  getLegalVersion: () => api.get('/auth/legal-version'),
   login:          (data) => api.post('/auth/login', data),
-  register:       (data) => api.post('/auth/register', data),
+  loginSms:       (data) => api.post('/auth/login-sms', data),
+  sendSmsCode:    (data) => api.post('/auth/sms/send', data),
+  sendBindPhoneCode: (data) => api.post('/auth/profile/phone/send-code', data),
+  bindPhone:      (data) => api.put('/auth/profile/phone', data),
+  forgotSmsSend:  (data) => api.post('/auth/forgot/sms/send', data),
+  forgotSmsReset: (data) => api.post('/auth/forgot/sms/reset', data),
+  forgotEmailSend:  (data) => api.post('/auth/forgot/email/send', data),
+  forgotEmailReset: (data) => api.post('/auth/forgot/email/reset', data),
   getProfile:     ()     => api.get('/auth/profile'),
   updateProfile:  (data) => api.put('/auth/profile', data),
   changePassword: (data) => api.put('/auth/change-password', data),

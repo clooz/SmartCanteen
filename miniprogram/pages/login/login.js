@@ -1,41 +1,56 @@
 const api = require('../../utils/api')
-const { setToken, setUserInfo } = require('../../utils/storage')
+const { setToken, setUserInfo, getLegalAgreedVersion, setLegalAgreedVersion } = require('../../utils/storage')
+const { LEGAL_VERSION, needsConsent } = require('../../utils/legal')
 
 Page({
   data: {
-    mode: 'login',
-    username: '',
+    mode: 'password',
+    email: '',
     password: '',
-    confirmPassword: '',
-    nickname: '',
-    companies: [],
-    selectedCompany: null,
-    selectedCompanyIndex: -1,
-    showPicker: false,
+    phone: '',
+    smsCode: '',
+    countdown: 0,
     loading: false,
+    agreed: false,
+    showLegalRow: true,
+    serverLegalVersion: LEGAL_VERSION,
   },
+
+  _timer: null,
 
   onLoad() {
-    this.loadCompanies()
+    this.refreshLegalUi()
+    this.fetchLegalVersion()
   },
 
-  async loadCompanies() {
+  onUnload() {
+    if (this._timer) clearInterval(this._timer)
+  },
+
+  async fetchLegalVersion() {
     try {
-      const res = await api.getCompanies()
-      this.setData({ companies: res.data || [] })
-    } catch {}
+      const res = await api.getLegalVersion()
+      const v = res.data && res.data.version != null ? String(res.data.version) : LEGAL_VERSION
+      this.setData({ serverLegalVersion: v })
+    } catch {
+      this.setData({ serverLegalVersion: LEGAL_VERSION })
+    }
+    this.refreshLegalUi()
   },
 
-  switchMode(e) {
+  refreshLegalUi() {
+    const { serverLegalVersion } = this.data
+    const agreedVer = getLegalAgreedVersion()
+    const show = needsConsent(agreedVer, serverLegalVersion)
     this.setData({
-      mode: e.currentTarget.dataset.mode,
-      password: '',
-      confirmPassword: '',
+      showLegalRow: show,
+      agreed: !show,
     })
   },
 
-  switchToLogin() {
-    this.setData({ mode: 'login' })
+  switchMode(e) {
+    const mode = e.currentTarget.dataset.mode
+    this.setData({ mode })
   },
 
   onInput(e) {
@@ -43,66 +58,115 @@ Page({
     this.setData({ [key]: e.detail.value })
   },
 
-  showCompanyPicker() {
-    this.setData({ showPicker: true })
+  toggleAgree() {
+    this.setData({ agreed: !this.data.agreed })
   },
 
-  hidePicker() {
-    this.setData({ showPicker: false })
+  startCountdown() {
+    if (this._timer) clearInterval(this._timer)
+    this.setData({ countdown: 60 })
+    this._timer = setInterval(() => {
+      const n = this.data.countdown - 1
+      if (n <= 0) {
+        clearInterval(this._timer)
+        this._timer = null
+        this.setData({ countdown: 0 })
+      } else {
+        this.setData({ countdown: n })
+      }
+    }, 1000)
   },
 
-  selectCompanyItem(e) {
-    this.setData({ selectedCompanyIndex: e.currentTarget.dataset.index })
-  },
-
-  confirmCompany() {
-    const { selectedCompanyIndex, companies } = this.data
-    if (selectedCompanyIndex < 0) {
-      wx.showToast({ title: '请选择公司', icon: 'none' })
+  async sendSms() {
+    const { phone, mode, countdown, loading, agreed, showLegalRow, serverLegalVersion } = this.data
+    if (loading || countdown > 0) return
+    if (showLegalRow && !agreed) {
+      wx.showToast({ title: '请先阅读并同意协议', icon: 'none' })
       return
     }
-    this.setData({
-      selectedCompany: companies[selectedCompanyIndex],
-      showPicker: false,
-    })
+    const purpose = mode === 'password' ? 'forgot_sms' : 'login'
+    if (mode === 'password') {
+      wx.showToast({ title: '请在「手机登录」下获取验证码', icon: 'none' })
+      return
+    }
+    const p = String(phone).replace(/\D/g, '')
+    if (!/^1\d{10}$/.test(p)) {
+      wx.showToast({ title: '请输入正确手机号', icon: 'none' })
+      return
+    }
+    this.setData({ loading: true })
+    try {
+      await api.sendSmsCode({ phone: p, purpose: 'login' })
+      wx.showToast({ title: '验证码已发送', icon: 'success' })
+      this.startCountdown()
+    } catch {
+    } finally {
+      this.setData({ loading: false })
+    }
   },
 
   async onSubmit() {
-    const { mode, username, password, confirmPassword, nickname, selectedCompany, loading } = this.data
+    const {
+      mode,
+      email,
+      password,
+      phone,
+      smsCode,
+      loading,
+      agreed,
+      showLegalRow,
+      serverLegalVersion,
+    } = this.data
     if (loading) return
-
-    if (!username.trim()) { wx.showToast({ title: '请输入用户名', icon: 'none' }); return }
-    if (!password) { wx.showToast({ title: '请输入密码', icon: 'none' }); return }
-
-    if (mode === 'register') {
-      if (!selectedCompany) { wx.showToast({ title: '请选择所在公司', icon: 'none' }); return }
-      if (password !== confirmPassword) { wx.showToast({ title: '两次密码不一致', icon: 'none' }); return }
-      if (password.length < 6) { wx.showToast({ title: '密码至少6位', icon: 'none' }); return }
+    if (showLegalRow && !agreed) {
+      wx.showToast({ title: '请先阅读并同意协议', icon: 'none' })
+      return
     }
 
     this.setData({ loading: true })
     try {
-      if (mode === 'login') {
-        const res = await api.login({ username: username.trim(), password })
+      if (mode === 'password') {
+        const u = String(email).trim()
+        if (!u) {
+          wx.showToast({ title: '请输入邮箱', icon: 'none' })
+          return
+        }
+        if (!password) {
+          wx.showToast({ title: '请输入密码', icon: 'none' })
+          return
+        }
+        const res = await api.login({ username: u, password })
         setToken(res.data.token)
         setUserInfo(res.data.user)
+        setLegalAgreedVersion(serverLegalVersion)
         getApp().globalData.token = res.data.token
         getApp().globalData.userInfo = res.data.user
         wx.switchTab({ url: '/pages/index/index' })
       } else {
-        await api.register({
-          username: username.trim(),
-          password,
-          nickname: nickname.trim() || username.trim(),
-          company_id: selectedCompany.id,
-        })
-        wx.showToast({ title: '注册成功，请登录', icon: 'success' })
-        setTimeout(() => this.setData({ mode: 'login', password: '', confirmPassword: '' }), 1500)
+        const p = String(phone).replace(/\D/g, '')
+        if (!/^1\d{10}$/.test(p)) {
+          wx.showToast({ title: '请输入正确手机号', icon: 'none' })
+          return
+        }
+        if (!smsCode.trim()) {
+          wx.showToast({ title: '请输入验证码', icon: 'none' })
+          return
+        }
+        const res = await api.loginSms({ phone: p, code: smsCode.trim() })
+        setToken(res.data.token)
+        setUserInfo(res.data.user)
+        setLegalAgreedVersion(serverLegalVersion)
+        getApp().globalData.token = res.data.token
+        getApp().globalData.userInfo = res.data.user
+        wx.switchTab({ url: '/pages/index/index' })
       }
     } catch {
-      // api.js 已统一 showToast
     } finally {
       this.setData({ loading: false })
     }
+  },
+
+  goForgot() {
+    wx.navigateTo({ url: '/pages/forgot-password/forgot-password' })
   },
 })

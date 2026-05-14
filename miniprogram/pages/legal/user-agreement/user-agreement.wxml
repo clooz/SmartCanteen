@@ -1,0 +1,17 @@
+<scroll-view scroll-y class="legal-scroll">
+  <view class="legal-doc">
+    <view class="h1">智慧食堂用户协议（摘要）</view>
+    <view class="p">欢迎使用智慧食堂小程序。本协议约定您与企业食堂管理方使用本服务的相关权利义务。</view>
+    <view class="h2">1. 账号与安全</view>
+    <view class="p">您使用管理员分配的邮箱账号或绑定手机号登录。请妥善保管密码与验证码，勿向他人泄露。因您保管不当导致的损失，由您自行承担。</view>
+    <view class="h2">2. 服务内容</view>
+    <view class="p">本服务提供订餐、充值、许愿等企业食堂相关功能，具体以实际开放功能为准。管理方有权根据运营需要调整功能。</view>
+    <view class="h2">3. 行为规范</view>
+    <view class="p">您应遵守法律法规及企业规章制度，不得利用本服务从事违法违规或侵害他人权益的行为。</view>
+    <view class="h2">4. 免责声明</view>
+    <view class="p">因不可抗力、网络故障、第三方原因等导致的服务中断或数据异常，在法律允许范围内管理方不承担责任。</view>
+    <view class="h2">5. 协议变更</view>
+    <view class="p">我们可适时修订本协议。修订后若您继续使用服务，即视为接受更新后的协议。</view>
+    <view class="p muted">以上为占位摘要，正式环境请替换为法务审定全文。</view>
+  </view>
+</scroll-view>

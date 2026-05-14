@@ -22,4 +22,23 @@ function clearAuth() {
   wx.removeStorageSync(USER_KEY)
 }
 
-module.exports = { getToken, setToken, getUserInfo, setUserInfo, clearAuth }
+const LEGAL_KEY = 'sc_legal_agreed_version'
+
+function getLegalAgreedVersion() {
+  return wx.getStorageSync(LEGAL_KEY) || ''
+}
+
+function setLegalAgreedVersion(version) {
+  wx.setStorageSync(LEGAL_KEY, String(version || ''))
+}
+
+module.exports = {
+  getToken,
+  setToken,
+  getUserInfo,
+  setUserInfo,
+  clearAuth,
+  getLegalAgreedVersion,
+  setLegalAgreedVersion,
+  LEGAL_KEY,
+}

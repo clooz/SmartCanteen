@@ -20,6 +20,7 @@ export const adminApi = {
   createCompany: (data: object) => request.post('/admin/companies', data),
   updateCompany: (id: number, data: object) =>
     request.put(`/admin/companies/${id}`, data),
+  deleteCompany: (id: number) => request.delete(`/admin/companies/${id}`),
 
   // 充值管理
   getRecharges: (params?: object) => request.get('/recharge', { params }),

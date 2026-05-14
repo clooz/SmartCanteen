@@ -1,6 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { syncUsers, getUsers, createUser, updateUser, resetUserPassword, getCompanies, createCompany, updateCompany } = require('../controllers/adminController');
+const {
+  syncUsers,
+  getUsers,
+  createUser,
+  updateUser,
+  resetUserPassword,
+  getCompanies,
+  createCompany,
+  updateCompany,
+  deleteCompany,
+} = require('../controllers/adminController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
 const adminOnly = [authenticate, authorize('admin')];
@@ -18,5 +28,6 @@ router.post('/users/sync', ...adminOnly, syncUsers);
 router.get('/companies', ...adminOnly, getCompanies);
 router.post('/companies', ...adminOnly, createCompany);
 router.put('/companies/:id', ...adminOnly, updateCompany);
+router.delete('/companies/:id', ...adminOnly, deleteCompany);
 
 module.exports = router;

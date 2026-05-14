@@ -32,6 +32,16 @@ function mark(page, item, condition, okDetail, failDetail) {
   addResult(page, item, !!condition, condition ? okDetail : failDetail)
 }
 
+/** 与 seed 中「验收」回填一致，避免公司管理列表里扩展字段全为空 */
+const walkthroughCompanyExtras = {
+  contact_name: '验收联系人',
+  contact_phone: '13900000999',
+  address: '自动化验收用地址（可删）',
+  remark: '接口验收脚本写入',
+  credit_code: '91110000MA01QA0099',
+  is_active: true,
+}
+
 async function run() {
   const created = {
     companyId: null,
@@ -76,7 +86,11 @@ async function run() {
     const companyCreate = await api('/admin/companies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '验收公司', code: companyCode }),
+      body: JSON.stringify({
+        name: '验收公司',
+        code: companyCode,
+        ...walkthroughCompanyExtras,
+      }),
     }, token)
     const companyCreateOk = (companyCreate.http === 200 || companyCreate.http === 201) && companyCreate.body?.code === 0 && companyCreate.body?.data?.id
     mark('公司管理', '新增公司', companyCreateOk, `id=${companyCreate.body?.data?.id}`, JSON.stringify(companyCreate.body))
@@ -86,7 +100,10 @@ async function run() {
       const companyUpdate = await api(`/admin/companies/${created.companyId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '验收公司-已更新' }),
+        body: JSON.stringify({
+          name: '验收公司-已更新',
+          ...walkthroughCompanyExtras,
+        }),
       }, token)
       mark('公司管理', '编辑公司', companyUpdate.http === 200 && companyUpdate.body?.code === 0, companyUpdate.body?.message, JSON.stringify(companyUpdate.body))
     }
@@ -95,7 +112,7 @@ async function run() {
     const usersList = await api('/admin/users?page=1&page_size=10', {}, token)
     mark('用户管理', '用户列表查询', usersList.http === 200 && usersList.body?.code === 0 && usersList.body?.data?.list, `total=${usersList.body?.data?.total}`, JSON.stringify(usersList.body))
 
-    const username = `qa_u_${Date.now().toString().slice(-6)}`
+    const username = `qa_u_${Date.now().toString().slice(-6)}@qa.local`
     created.username = username
     const userCreate = await api('/admin/users', {
       method: 'POST',
@@ -270,14 +287,14 @@ async function run() {
     const lowLogin = await api('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'emp001', password: '123456' }),
+      body: JSON.stringify({ username: 'emp001@demo.local', password: '123456' }),
     })
     if (lowLogin.http === 200 && lowLogin.body?.code === 0) {
       const empToken = lowLogin.body?.data?.token
       const denied = await api('/admin/users?page=1&page_size=1', {}, empToken)
       mark('权限控制', '员工访问管理员接口应被拒绝', denied.http === 403 || denied.body?.code !== 0, `http=${denied.http}, msg=${denied.body?.message}`, JSON.stringify(denied.body))
     } else {
-      addResult('权限控制', '员工登录验收账号', false, '无法登录 emp001，无法进行权限拒绝测试')
+      addResult('权限控制', '员工登录验收账号', false, '无法登录 emp001@demo.local，无法进行权限拒绝测试')
     }
   } catch (e) {
     notes.push(`执行异常：${e.message}`)

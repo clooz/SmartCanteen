@@ -1,6 +1,13 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../db/connection');
 const { success, fail } = require('../utils/response');
+const { normalizePhone } = require('../services/smsService');
+
+function normalizeUsername(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  return s.includes('@') ? s.toLowerCase() : s;
+}
 
 /**
  * 批量同步/导入用户（外部工作平台对接入口）
@@ -10,7 +17,8 @@ const { success, fail } = require('../utils/response');
  *   source: 'dingtalk' | 'wecom' | 'feishu' | 'hr' | string,  // 来源标识
  *   users: [{
  *     ext_uid:      string,   // 外部平台唯一ID（首选匹配键）
- *     username:     string,   // 本系统用户名/手机号（ext_uid 缺失时匹配用）
+ *     username:     string,   // 本系统登录名，常用邮箱（ext_uid 缺失时匹配用）
+ *     phone:        string,   // 可选，11 位手机号
  *     nickname:     string,   // 姓名/昵称
  *     company_code: string,   // 公司编码，如 A/B/C/D（可选）
  *     role:         'employee'|'chef'|'admin',  // 默认 employee
@@ -38,7 +46,24 @@ const syncUsers = async (req, res) => {
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
   for (const u of users) {
-    const { ext_uid, username, nickname, company_code, role = 'employee', is_active = 1 } = u;
+    const {
+      ext_uid,
+      username,
+      phone: rawPhone,
+      nickname,
+      company_code,
+      role = 'employee',
+      is_active = 1,
+    } = u;
+    let phoneNorm = null;
+    if (rawPhone !== undefined && rawPhone !== null && String(rawPhone).trim() !== '') {
+      phoneNorm = normalizePhone(rawPhone);
+      if (!phoneNorm) {
+        errors.push({ raw: u, reason: 'phone 格式无效，跳过' });
+        skipped++;
+        continue;
+      }
+    }
 
     if (!ext_uid && !username) {
       errors.push({ raw: u, reason: 'ext_uid 和 username 均为空，跳过' });
@@ -61,35 +86,48 @@ const syncUsers = async (req, res) => {
         if (rows.length) existing = rows[0];
       }
       if (!existing && username) {
-        const [rows] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+        const un = normalizeUsername(username);
+        const [rows] = await pool.query('SELECT id FROM users WHERE username = ?', [un]);
         if (rows.length) existing = rows[0];
       }
 
       if (existing) {
-        // 更新已有用户（不覆盖密码）
-        await pool.query(
-          `UPDATE users SET
-             nickname    = COALESCE(NULLIF(?, ''), nickname),
-             company_id  = COALESCE(?, company_id),
-             role        = ?,
-             is_active   = ?,
-             ext_uid     = COALESCE(ext_uid, ?),
-             sync_source = ?,
-             synced_at   = ?
-           WHERE id = ?`,
-          [nickname || '', company_id, role, is_active,
-           ext_uid || null, source, now, existing.id]
-        );
+        const sets = [
+          'nickname    = COALESCE(NULLIF(?, \'\'), nickname)',
+          'company_id  = COALESCE(?, company_id)',
+          'role        = ?',
+          'is_active   = ?',
+          'ext_uid     = COALESCE(ext_uid, ?)',
+          'sync_source = ?',
+          'synced_at   = ?',
+        ];
+        const vals = [nickname || '', company_id, role, is_active, ext_uid || null, source, now];
+        if (phoneNorm) {
+          sets.push('phone = ?');
+          vals.push(phoneNorm);
+        }
+        vals.push(existing.id);
+        await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, vals);
         updated++;
       } else {
         // 新建用户，默认密码 123456
         const defaultPwd = await bcrypt.hash('123456', 10);
-        const finalUsername = username || `sync_${source}_${ext_uid}`;
+        const finalUsername = normalizeUsername(username) || `sync_${source}_${ext_uid}`;
         await pool.query(
-          `INSERT INTO users (username, password, nickname, role, company_id, is_active, ext_uid, sync_source, synced_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [finalUsername, defaultPwd, nickname || finalUsername,
-           role, company_id, is_active, ext_uid || null, source, now]
+          `INSERT INTO users (username, phone, password, nickname, role, company_id, is_active, ext_uid, sync_source, synced_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            finalUsername,
+            phoneNorm,
+            defaultPwd,
+            nickname || finalUsername,
+            role,
+            company_id,
+            is_active,
+            ext_uid || null,
+            source,
+            now,
+          ]
         );
         created++;
       }
@@ -112,7 +150,11 @@ const getUsers = async (req, res) => {
   let params = [];
   if (role) { where.push('u.role = ?'); params.push(role); }
   if (company_id) { where.push('u.company_id = ?'); params.push(company_id); }
-  if (keyword) { where.push('(u.username LIKE ? OR u.nickname LIKE ?)'); params.push(`%${keyword}%`, `%${keyword}%`); }
+  if (keyword) {
+    where.push('(u.username LIKE ? OR u.nickname LIKE ? OR u.phone LIKE ?)');
+    const k = `%${keyword}%`;
+    params.push(k, k, k);
+  }
   if (username) { where.push('u.username LIKE ?'); params.push(`%${String(username).trim()}%`); }
   if (nickname) { where.push('u.nickname LIKE ?'); params.push(`%${String(nickname).trim()}%`); }
   if (is_active !== undefined && is_active !== '' && is_active !== null) {
@@ -128,7 +170,7 @@ const getUsers = async (req, res) => {
       params
     );
     const [rows] = await pool.query(
-      `SELECT u.id, u.username, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
+      `SELECT u.id, u.username, u.phone, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
               u.ext_uid, u.sync_source, u.synced_at, u.created_at,
               c.name AS company_name, c.code AS company_code
        FROM users u
@@ -147,18 +189,30 @@ const getUsers = async (req, res) => {
 
 // 创建用户（管理员手动创建厨师/管理员账号）
 const createUser = async (req, res) => {
-  const { username, password, nickname, role, company_id } = req.body;
-  if (!username || !password || !role) return fail(res, '用户名、密码和角色不能为空');
+  const { username, password, nickname, role, company_id, phone } = req.body;
+  if (!username || !password || !role) return fail(res, '登录名、密码和角色不能为空');
   if (!['employee', 'chef', 'admin'].includes(role)) return fail(res, '无效的角色');
 
+  const un = normalizeUsername(username);
+  let phoneNorm = null;
+  if (phone !== undefined && phone !== null && String(phone).trim() !== '') {
+    phoneNorm = normalizePhone(phone);
+    if (!phoneNorm) return fail(res, '手机号格式无效');
+  }
+
   try {
-    const [existing] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
-    if (existing.length > 0) return fail(res, '该用户名已被注册');
+    const [existing] = await pool.query('SELECT id FROM users WHERE username = ?', [un]);
+    if (existing.length > 0) return fail(res, '该登录名已被使用');
+
+    if (phoneNorm) {
+      const [pDup] = await pool.query('SELECT id FROM users WHERE phone = ?', [phoneNorm]);
+      if (pDup.length) return fail(res, '该手机号已被使用');
+    }
 
     const hashed = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
-      'INSERT INTO users (username, password, nickname, role, company_id) VALUES (?, ?, ?, ?, ?)',
-      [username, hashed, nickname || username, role, company_id || null]
+      'INSERT INTO users (username, phone, password, nickname, role, company_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [un, phoneNorm, hashed, nickname || un, role, company_id || null]
     );
     return success(res, { id: result.insertId }, '用户创建成功', 201);
   } catch (err) {
@@ -169,7 +223,7 @@ const createUser = async (req, res) => {
 
 // 更新用户信息
 const updateUser = async (req, res) => {
-  const { nickname, role, company_id, is_active } = req.body;
+  const { nickname, role, company_id, is_active, phone } = req.body;
   const userId = req.params.id;
 
   // 不允许修改自己的角色/状态（防止自锁）
@@ -187,6 +241,19 @@ const updateUser = async (req, res) => {
     if (role !== undefined) { fields.push('role = ?'); params.push(role); }
     if (company_id !== undefined) { fields.push('company_id = ?'); params.push(company_id || null); }
     if (is_active !== undefined) { fields.push('is_active = ?'); params.push(parseInt(is_active)); }
+    if (phone !== undefined) {
+      const p = String(phone || '').trim();
+      if (p === '') {
+        fields.push('phone = NULL');
+      } else {
+        const ph = normalizePhone(p);
+        if (!ph) return fail(res, '手机号格式无效');
+        const [pd] = await pool.query('SELECT id FROM users WHERE phone = ? AND id <> ?', [ph, userId]);
+        if (pd.length) return fail(res, '该手机号已被其他用户使用');
+        fields.push('phone = ?');
+        params.push(ph);
+      }
+    }
 
     if (fields.length === 0) return fail(res, '没有需要更新的字段');
 
@@ -234,18 +301,36 @@ const getCompanies = async (req, res) => {
   }
 };
 
+const normStr = (v) => {
+  if (v === undefined || v === null) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+};
+
 // 创建公司
 const createCompany = async (req, res) => {
-  const { name, code } = req.body;
+  const { name, code, contact_name, contact_phone, address, remark, credit_code, is_active } = req.body;
   if (!name || !code) return fail(res, '公司名称和编码不能为空');
 
   try {
-    const [existing] = await pool.query('SELECT id FROM companies WHERE code = ?', [code]);
+    const codeUpper = String(code).toUpperCase();
+    const [existing] = await pool.query('SELECT id FROM companies WHERE code = ?', [codeUpper]);
     if (existing.length > 0) return fail(res, '该公司编码已存在');
 
+    const active = is_active === undefined || is_active === null ? 1 : is_active ? 1 : 0;
     const [result] = await pool.query(
-      'INSERT INTO companies (name, code) VALUES (?, ?)',
-      [name, code.toUpperCase()]
+      `INSERT INTO companies (name, code, contact_name, contact_phone, address, remark, credit_code, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        String(name).trim(),
+        codeUpper,
+        normStr(contact_name),
+        normStr(contact_phone),
+        normStr(address),
+        normStr(remark),
+        normStr(credit_code),
+        active,
+      ]
     );
     return success(res, { id: result.insertId }, '公司创建成功', 201);
   } catch (err) {
@@ -254,16 +339,41 @@ const createCompany = async (req, res) => {
   }
 };
 
-// 更新公司信息
+// 更新公司信息（未出现在 body 中的字段保持原值，便于脚本只改 name）
 const updateCompany = async (req, res) => {
-  const { name } = req.body;
-  if (!name) return fail(res, '公司名称不能为空');
+  const b = req.body || {};
+  if (!b.name || String(b.name).trim() === '') return fail(res, '公司名称不能为空');
 
   try {
-    const [existing] = await pool.query('SELECT id FROM companies WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT * FROM companies WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return fail(res, '公司不存在', 404);
+    const cur = existing[0];
 
-    await pool.query('UPDATE companies SET name = ? WHERE id = ?', [name, req.params.id]);
+    const next = {
+      name: String(b.name).trim(),
+      contact_name: 'contact_name' in b ? normStr(b.contact_name) : cur.contact_name,
+      contact_phone: 'contact_phone' in b ? normStr(b.contact_phone) : cur.contact_phone,
+      address: 'address' in b ? normStr(b.address) : cur.address,
+      remark: 'remark' in b ? normStr(b.remark) : cur.remark,
+      credit_code: 'credit_code' in b ? normStr(b.credit_code) : cur.credit_code,
+      is_active:
+        'is_active' in b ? (b.is_active ? 1 : 0) : (cur.is_active === undefined ? 1 : cur.is_active ? 1 : 0),
+    };
+
+    await pool.query(
+      `UPDATE companies SET name = ?, contact_name = ?, contact_phone = ?, address = ?, remark = ?, credit_code = ?, is_active = ?
+       WHERE id = ?`,
+      [
+        next.name,
+        next.contact_name,
+        next.contact_phone,
+        next.address,
+        next.remark,
+        next.credit_code,
+        next.is_active,
+        req.params.id,
+      ]
+    );
     return success(res, null, '更新成功');
   } catch (err) {
     console.error('updateCompany error:', err);
@@ -271,4 +381,44 @@ const updateCompany = async (req, res) => {
   }
 };
 
-module.exports = { syncUsers, getUsers, createUser, updateUser, resetUserPassword, getCompanies, createCompany, updateCompany };
+// 删除公司（仅当 role=employee 且归属该公司的用户数为 0）
+const deleteCompany = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id) || id < 1) return fail(res, '无效的公司ID', 400);
+
+  try {
+    const [empRows] = await pool.query(
+      `SELECT COUNT(*) AS n FROM users WHERE company_id = ? AND role = 'employee'`,
+      [id]
+    );
+    const n = Number(empRows[0]?.n ?? 0);
+    if (n > 0) {
+      return fail(
+        res,
+        `该公司仍有 ${n} 名员工，无法删除。请先将员工调离或删除后再操作。`,
+        400
+      );
+    }
+
+    const [exist] = await pool.query('SELECT id FROM companies WHERE id = ?', [id]);
+    if (!exist.length) return fail(res, '公司不存在', 404);
+
+    await pool.query('DELETE FROM companies WHERE id = ?', [id]);
+    return success(res, null, '公司已删除');
+  } catch (err) {
+    console.error('deleteCompany error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
+module.exports = {
+  syncUsers,
+  getUsers,
+  createUser,
+  updateUser,
+  resetUserPassword,
+  getCompanies,
+  createCompany,
+  updateCompany,
+  deleteCompany,
+};

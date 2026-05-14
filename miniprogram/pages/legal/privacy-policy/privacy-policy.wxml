@@ -1,0 +1,17 @@
+<scroll-view scroll-y class="legal-scroll">
+  <view class="legal-doc">
+    <view class="h1">智慧食堂隐私政策（摘要）</view>
+    <view class="p">我们重视您的个人信息保护。本政策说明我们如何收集、使用、存储与保护您的信息。</view>
+    <view class="h2">1. 我们收集的信息</view>
+    <view class="p">为提供登录与食堂服务，我们可能处理：登录邮箱、昵称、绑定手机号、订单与充值等业务数据，以及为保障安全所需的设备与日志信息。</view>
+    <view class="h2">2. 使用目的</view>
+    <view class="p">用于身份验证、业务办理、客服与安全管理、遵守法律法规要求等。</view>
+    <view class="h2">3. 存储与保护</view>
+    <view class="p">我们采取合理的技术与管理措施保护您的信息。除法律要求或经您授权外，不会向无关第三方提供。</view>
+    <view class="h2">4. 您的权利</view>
+    <view class="p">在符合法律规定的前提下，您可联系企业管理员或我们行使查阅、更正、删除等权利。</view>
+    <view class="h2">5. 政策更新</view>
+    <view class="p">我们可能适时更新本政策，并通过小程序提示等方式告知重要变更。</view>
+    <view class="p muted">以上为占位摘要，正式环境请替换为法务审定全文。</view>
+  </view>
+</scroll-view>

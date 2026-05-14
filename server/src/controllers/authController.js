@@ -2,8 +2,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db/connection');
 const { success, fail } = require('../utils/response');
+const {
+  normalizePhone,
+  normalizeEmail,
+  maskPhone,
+  sendVerificationCode,
+  verifyCode,
+} = require('../services/smsService');
 
-// 生成 JWT Token
 function generateToken(user) {
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role, company_id: user.company_id },
@@ -12,69 +18,60 @@ function generateToken(user) {
   );
 }
 
-// 注册（仅限 employee 角色，员工自行注册）
-const register = async (req, res) => {
-  const { username, password, nickname, company_id } = req.body;
+function publicUser(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    nickname: row.nickname,
+    avatar: row.avatar,
+    role: row.role,
+    company_id: row.company_id,
+    company_name: row.company_name,
+    company_code: row.company_code,
+    has_phone: Boolean(row.phone),
+    phone_masked: row.phone ? maskPhone(row.phone) : '',
+  };
+}
 
-  if (!username || !password) {
-    return fail(res, '用户名和密码不能为空');
-  }
-  if (username.length < 3 || username.length > 50) {
-    return fail(res, '用户名长度需在 3-50 个字符之间');
-  }
-  if (password.length < 6) {
-    return fail(res, '密码长度不能少于 6 位');
-  }
-  if (!company_id) {
-    return fail(res, '请选择所属公司');
-  }
+const registerDisabled = async (req, res) =>
+  fail(res, '请联系管理员分配账号，不支持自助注册', 403);
 
-  try {
-    // 检查用户名是否已存在
-    const [existing] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
-    if (existing.length > 0) {
-      return fail(res, '该用户名已被注册');
-    }
-
-    // 检查公司是否存在
-    const [company] = await pool.query('SELECT id FROM companies WHERE id = ?', [company_id]);
-    if (company.length === 0) {
-      return fail(res, '所选公司不存在');
-    }
-
-    const hashed = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      'INSERT INTO users (username, password, nickname, role, company_id) VALUES (?, ?, ?, "employee", ?)',
-      [username, hashed, nickname || username, company_id]
-    );
-
-    return success(res, { id: result.insertId }, '注册成功', 201);
-  } catch (err) {
-    console.error('register error:', err);
-    return fail(res, '服务器错误', 500);
-  }
-};
-
-// 登录（所有角色通用）
 const login = async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return fail(res, '用户名和密码不能为空');
+    return fail(res, '账号和密码不能为空');
   }
 
+  const raw = String(username).trim();
+  const ph = normalizePhone(raw);
+  const emailGuess = raw.includes('@') ? normalizeEmail(raw) : null;
+
   try {
-    const [rows] = await pool.query(
-      `SELECT u.id, u.username, u.password, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
-              c.name AS company_name, c.code AS company_code
-       FROM users u
-       LEFT JOIN companies c ON u.company_id = c.id
-       WHERE u.username = ?`,
-      [username]
-    );
+    let rows;
+    if (ph) {
+      [rows] = await pool.query(
+        `SELECT u.id, u.username, u.password, u.phone, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
+                c.name AS company_name, c.code AS company_code
+         FROM users u
+         LEFT JOIN companies c ON u.company_id = c.id
+         WHERE u.phone = ? OR LOWER(TRIM(u.username)) = LOWER(?)`,
+        [ph, raw]
+      );
+    } else {
+      const key = emailGuess || raw;
+      [rows] = await pool.query(
+        `SELECT u.id, u.username, u.password, u.phone, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
+                c.name AS company_name, c.code AS company_code
+         FROM users u
+         LEFT JOIN companies c ON u.company_id = c.id
+         WHERE LOWER(TRIM(u.username)) = LOWER(?)`,
+        [key]
+      );
+    }
 
     if (rows.length === 0) {
-      return fail(res, '用户名或密码错误');
+      return fail(res, '账号或密码错误');
     }
 
     const user = rows[0];
@@ -85,23 +82,14 @@ const login = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return fail(res, '用户名或密码错误');
+      return fail(res, '账号或密码错误');
     }
 
     const token = generateToken(user);
 
     return success(res, {
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        nickname: user.nickname,
-        avatar: user.avatar,
-        role: user.role,
-        company_id: user.company_id,
-        company_name: user.company_name,
-        company_code: user.company_code,
-      },
+      user: publicUser(user),
     }, '登录成功');
   } catch (err) {
     console.error('login error:', err);
@@ -109,11 +97,74 @@ const login = async (req, res) => {
   }
 };
 
-// 获取当前用户信息
+const sendSmsCode = async (req, res) => {
+  const { phone, purpose = 'login' } = req.body;
+  const ph = normalizePhone(phone);
+  if (!ph) return fail(res, '请输入正确的手机号');
+
+  const allowed = new Set(['login', 'forgot_sms']);
+  if (!allowed.has(purpose)) return fail(res, '无效的用途');
+
+  try {
+    if (purpose === 'login') {
+      const [u] = await pool.query(
+        'SELECT id FROM users WHERE phone = ? AND is_active = 1',
+        [ph]
+      );
+      if (!u.length) {
+        return fail(res, '该手机号未开通，请使用邮箱登录后在个人中心绑定手机，或联系管理员');
+      }
+    }
+    if (purpose === 'forgot_sms') {
+      const [u] = await pool.query(
+        'SELECT id FROM users WHERE phone = ? AND is_active = 1',
+        [ph]
+      );
+      if (!u.length) return fail(res, '该手机号未绑定任何账号');
+    }
+
+    await sendVerificationCode({ target: ph, channel: 'sms', purpose });
+    return success(res, { sent: true }, '验证码已发送');
+  } catch (e) {
+    if (e.status === 429) return fail(res, e.message, 429);
+    console.error('sendSmsCode error:', e);
+    return fail(res, e.message || '发送失败', 500);
+  }
+};
+
+const loginSms = async (req, res) => {
+  const { phone, code } = req.body;
+  const ph = normalizePhone(phone);
+  if (!ph || !code) return fail(res, '请输入手机号和验证码');
+
+  try {
+    const ok = await verifyCode({ target: ph, channel: 'sms', purpose: 'login', code });
+    if (!ok) return fail(res, '验证码错误或已过期');
+
+    const [rows] = await pool.query(
+      `SELECT u.id, u.username, u.password, u.phone, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
+              c.name AS company_name, c.code AS company_code
+       FROM users u
+       LEFT JOIN companies c ON u.company_id = c.id
+       WHERE u.phone = ?`,
+      [ph]
+    );
+    if (!rows.length) return fail(res, '该手机号未开通');
+    const user = rows[0];
+    if (!user.is_active) return fail(res, '账号已被禁用，请联系管理员');
+
+    const token = generateToken(user);
+    return success(res, { token, user: publicUser(user) }, '登录成功');
+  } catch (err) {
+    console.error('loginSms error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
 const getProfile = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT u.id, u.username, u.nickname, u.avatar, u.role, u.company_id, u.created_at,
+      `SELECT u.id, u.username, u.phone, u.nickname, u.avatar, u.role, u.company_id, u.created_at,
               c.name AS company_name, c.code AS company_code
        FROM users u
        LEFT JOIN companies c ON u.company_id = c.id
@@ -125,14 +176,20 @@ const getProfile = async (req, res) => {
       return fail(res, '用户不存在', 404);
     }
 
-    return success(res, rows[0]);
+    const row = rows[0];
+    const data = {
+      ...row,
+      has_phone: Boolean(row.phone),
+      phone_masked: row.phone ? maskPhone(row.phone) : '',
+    };
+    delete data.phone;
+    return success(res, data);
   } catch (err) {
     console.error('getProfile error:', err);
     return fail(res, '服务器错误', 500);
   }
 };
 
-// 修改个人信息（昵称、头像 URL，可只传其一）
 const updateProfile = async (req, res) => {
   const { nickname, avatar } = req.body;
 
@@ -168,7 +225,6 @@ const updateProfile = async (req, res) => {
   }
 };
 
-// 上传头像（multipart，字段名 avatar）
 const uploadAvatar = async (req, res) => {
   try {
     if (!req.file) {
@@ -186,7 +242,6 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
-// 修改密码
 const changePassword = async (req, res) => {
   const { old_password, new_password } = req.body;
 
@@ -214,10 +269,11 @@ const changePassword = async (req, res) => {
   }
 };
 
-// 获取公司列表（注册时选择用）
 const getCompanies = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name, code FROM companies ORDER BY code');
+    const [rows] = await pool.query(
+      'SELECT id, name, code FROM companies WHERE is_active = 1 ORDER BY code'
+    );
     return success(res, rows);
   } catch (err) {
     console.error('getCompanies error:', err);
@@ -225,4 +281,162 @@ const getCompanies = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getProfile, updateProfile, uploadAvatar, changePassword, getCompanies };
+const getLegalVersion = async (req, res) => {
+  return success(res, { version: String(process.env.LEGAL_VERSION || '1').trim() });
+};
+
+const bindPhone = async (req, res) => {
+  const { phone, code } = req.body;
+  const ph = normalizePhone(phone);
+  if (!ph || !code) return fail(res, '请输入手机号和验证码');
+
+  try {
+    const ok = await verifyCode({ target: ph, channel: 'sms', purpose: 'bind_phone', code });
+    if (!ok) return fail(res, '验证码错误或已过期');
+
+    const [dup] = await pool.query('SELECT id FROM users WHERE phone = ? AND id <> ?', [
+      ph,
+      req.user.id,
+    ]);
+    if (dup.length) return fail(res, '该手机号已被其他账号绑定');
+
+    await pool.query('UPDATE users SET phone = ? WHERE id = ?', [ph, req.user.id]);
+    return success(res, null, '绑定成功');
+  } catch (err) {
+    console.error('bindPhone error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
+/** 登录态：发送绑定手机验证码 */
+const sendBindPhoneCode = async (req, res) => {
+  const { phone } = req.body;
+  const ph = normalizePhone(phone);
+  if (!ph) return fail(res, '请输入正确的手机号');
+
+  try {
+    const [dup] = await pool.query('SELECT id FROM users WHERE phone = ? AND id <> ?', [
+      ph,
+      req.user.id,
+    ]);
+    if (dup.length) return fail(res, '该手机号已被其他账号使用');
+
+    await sendVerificationCode({ target: ph, channel: 'sms', purpose: 'bind_phone' });
+    return success(res, { sent: true }, '验证码已发送');
+  } catch (e) {
+    if (e.status === 429) return fail(res, e.message, 429);
+    console.error('sendBindPhoneCode error:', e);
+    return fail(res, e.message || '发送失败', 500);
+  }
+};
+
+const forgotSmsSend = async (req, res) => {
+  const { phone } = req.body;
+  const ph = normalizePhone(phone);
+  if (!ph) return fail(res, '请输入正确的手机号');
+
+  try {
+    const [u] = await pool.query(
+      'SELECT id FROM users WHERE phone = ? AND is_active = 1',
+      [ph]
+    );
+    if (!u.length) return fail(res, '该手机号未绑定任何账号');
+
+    await sendVerificationCode({ target: ph, channel: 'sms', purpose: 'forgot_sms' });
+    return success(res, { sent: true }, '验证码已发送');
+  } catch (e) {
+    if (e.status === 429) return fail(res, e.message, 429);
+    console.error('forgotSmsSend error:', e);
+    return fail(res, e.message || '发送失败', 500);
+  }
+};
+
+const forgotSmsReset = async (req, res) => {
+  const { phone, code, new_password } = req.body;
+  const ph = normalizePhone(phone);
+  if (!ph || !code || !new_password) return fail(res, '请填写完整信息');
+  if (new_password.length < 6) return fail(res, '新密码至少6位');
+
+  try {
+    const ok = await verifyCode({ target: ph, channel: 'sms', purpose: 'forgot_sms', code });
+    if (!ok) return fail(res, '验证码错误或已过期');
+
+    const [rows] = await pool.query(
+      'SELECT id FROM users WHERE phone = ? AND is_active = 1',
+      [ph]
+    );
+    if (!rows.length) return fail(res, '用户不存在');
+
+    const hashed = await bcrypt.hash(new_password, 10);
+    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashed, rows[0].id]);
+    return success(res, null, '密码已重置，请使用新密码登录');
+  } catch (err) {
+    console.error('forgotSmsReset error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
+const forgotEmailSend = async (req, res) => {
+  const { email } = req.body;
+  const em = normalizeEmail(email);
+  if (!em) return fail(res, '请输入正确的邮箱');
+
+  try {
+    const [u] = await pool.query(
+      'SELECT id FROM users WHERE LOWER(TRIM(username)) = ? AND is_active = 1',
+      [em]
+    );
+    if (!u.length) return fail(res, '该邮箱未注册');
+
+    await sendVerificationCode({ target: em, channel: 'email', purpose: 'forgot_email' });
+    return success(res, { sent: true }, '验证码已发送，请查收邮箱（开发环境见服务端日志）');
+  } catch (e) {
+    if (e.status === 429) return fail(res, e.message, 429);
+    console.error('forgotEmailSend error:', e);
+    return fail(res, e.message || '发送失败', 500);
+  }
+};
+
+const forgotEmailReset = async (req, res) => {
+  const { email, code, new_password } = req.body;
+  const em = normalizeEmail(email);
+  if (!em || !code || !new_password) return fail(res, '请填写完整信息');
+  if (new_password.length < 6) return fail(res, '新密码至少6位');
+
+  try {
+    const ok = await verifyCode({ target: em, channel: 'email', purpose: 'forgot_email', code });
+    if (!ok) return fail(res, '验证码错误或已过期');
+
+    const [rows] = await pool.query(
+      'SELECT id FROM users WHERE LOWER(TRIM(username)) = ? AND is_active = 1',
+      [em]
+    );
+    if (!rows.length) return fail(res, '用户不存在');
+
+    const hashed = await bcrypt.hash(new_password, 10);
+    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashed, rows[0].id]);
+    return success(res, null, '密码已重置，请使用新密码登录');
+  } catch (err) {
+    console.error('forgotEmailReset error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
+module.exports = {
+  register: registerDisabled,
+  login,
+  sendSmsCode,
+  loginSms,
+  getProfile,
+  updateProfile,
+  uploadAvatar,
+  changePassword,
+  getCompanies,
+  getLegalVersion,
+  bindPhone,
+  sendBindPhoneCode,
+  forgotSmsSend,
+  forgotSmsReset,
+  forgotEmailSend,
+  forgotEmailReset,
+};

@@ -1,6 +1,9 @@
 {
   "pages": [
     "pages/login/login",
+    "pages/forgot-password/forgot-password",
+    "pages/legal/user-agreement/user-agreement",
+    "pages/legal/privacy-policy/privacy-policy",
     "pages/index/index",
     "pages/order/order",
     "pages/my-orders/my-orders",

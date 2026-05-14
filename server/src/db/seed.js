@@ -23,43 +23,130 @@ const datetimeOffset = (days, hour = 12, minute = 0) => {
 const orderNo = (suffix) =>
   `ORD${Date.now().toString().slice(-8)}${String(suffix).padStart(4, '0')}`;
 
+/** 与 init.js seedInitialData 一致，供演示库补全公司扩展字段 */
+const DEMO_COMPANY_BY_CODE = [
+  {
+    code: 'A',
+    contact_name: '王明',
+    contact_phone: '010-88880101',
+    address: '北京市海淀区科技园路1号A座3层',
+    remark: '演示数据：研发中心',
+    credit_code: '91110108MA01DEMO0A',
+    is_active: 1,
+  },
+  {
+    code: 'B',
+    contact_name: '李华',
+    contact_phone: '021-66660202',
+    address: '上海市浦东新区制造大道88号',
+    remark: '演示数据：生产制造基地',
+    credit_code: '91310115MA01DEMO0B',
+    is_active: 1,
+  },
+  {
+    code: 'C',
+    contact_name: '陈静',
+    contact_phone: '0755-88880303',
+    address: '深圳市南山区粤海街道软件园二期',
+    remark: '演示数据：华南分部',
+    credit_code: '91440300MA01DEMO0C',
+    is_active: 1,
+  },
+  {
+    code: 'D',
+    contact_name: '赵磊',
+    contact_phone: '028-88880404',
+    address: '成都市高新区天府大道中段',
+    remark: '演示数据：西南运营中心',
+    credit_code: '91510100MA01DEMO0D',
+    is_active: 1,
+  },
+];
+
 // ── 主流程 ────────────────────────────────────────────────
 async function seed() {
   console.log('🌱 开始写入演示数据...\n');
+
+  // ── 0. 公司扩展字段（与默认 A/B/C/D 对齐）────────────────
+  console.log('🏢 补全公司联系人、地址等演示字段...');
+  let companyDemoOk = 0;
+  for (const c of DEMO_COMPANY_BY_CODE) {
+    try {
+      const [r] = await pool.query(
+        `UPDATE companies SET contact_name = ?, contact_phone = ?, address = ?, remark = ?, credit_code = ?, is_active = ?
+         WHERE code = ?`,
+        [
+          c.contact_name,
+          c.contact_phone,
+          c.address,
+          c.remark,
+          c.credit_code,
+          c.is_active,
+          c.code,
+        ]
+      );
+      if (r.affectedRows > 0) companyDemoOk += 1;
+    } catch (e) {
+      console.warn(`   ⚠ 更新公司 ${c.code} 扩展字段失败（是否已执行库迁移？）:`, e.message);
+    }
+  }
+  console.log(`   ✅ 已尝试更新 ${DEMO_COMPANY_BY_CODE.length} 家公司的扩展信息（命中 ${companyDemoOk} 行）`);
+
+  // 历史 admin-walkthrough-check 只写了 name/code，名称以「验收」开头的公司在此补占位数据
+  try {
+    const [r] = await pool.query(
+      `UPDATE companies SET
+        contact_name = '验收联系人',
+        contact_phone = '13900000999',
+        address = '自动化验收用地址（可删）',
+        remark = '由 seed 对历史验收数据补齐',
+        credit_code = '91110000MA01QA0099',
+        is_active = 1
+       WHERE name LIKE '验收%' AND (contact_name IS NULL OR TRIM(IFNULL(contact_name, '')) = '')`
+    );
+    if (r.affectedRows > 0) {
+      console.log(`   ✅ 已为 ${r.affectedRows} 家「验收」相关公司补全扩展字段\n`);
+    } else {
+      console.log('   （无待补全的验收公司）\n');
+    }
+  } catch (e) {
+    console.warn('   ⚠ 验收公司扩展字段回填失败:', e.message, '\n');
+  }
 
   // ── 1. 用户 ─────────────────────────────────────────────
   console.log('👤 写入用户...');
   const pw = await bcrypt.hash('123456', 10);
   const pwAdmin = await bcrypt.hash('admin123', 10);
 
+  const empEmail = (n) => `emp${String(n).padStart(3, '0')}@demo.local`;
+
   const users = [
-    // role, username, nickname, company_code
-    ['admin',    'admin',   '系统管理员', null],
-    ['chef',     'chef01',  '张伟',        null],
-    ['chef',     'chef02',  '李娜',        null],
-    ['employee', 'emp001',  '王芳',        'A'],
-    ['employee', 'emp002',  '刘洋',        'A'],
-    ['employee', 'emp003',  '陈静',        'A'],
-    ['employee', 'emp004',  '赵磊',        'B'],
-    ['employee', 'emp005',  '孙丽',        'B'],
-    ['employee', 'emp006',  '周强',        'B'],
-    ['employee', 'emp007',  '吴敏',        'C'],
-    ['employee', 'emp008',  '郑勇',        'C'],
-    ['employee', 'emp009',  '黄霞',        'D'],
-    ['employee', 'emp010',  '林峰',        'D'],
+    ['admin',    'admin',   '13900000001', '系统管理员', null],
+    ['chef',     'chef@demo.local', '13900010002', '张伟',        null],
+    ['chef',     'chef02@demo.local', '13900010003', '李娜',        null],
+    ['employee', empEmail(1),  '13800238001', '王芳',        'A'],
+    ['employee', empEmail(2),  '13800238002', '刘洋',        'A'],
+    ['employee', empEmail(3),  '13800238003', '陈静',        'A'],
+    ['employee', empEmail(4),  '13800238004', '赵磊',        'B'],
+    ['employee', empEmail(5),  '13800238005', '孙丽',        'B'],
+    ['employee', empEmail(6),  '13800238006', '周强',        'B'],
+    ['employee', empEmail(7),  '13800238007', '吴敏',        'C'],
+    ['employee', empEmail(8),  '13800238008', '郑勇',        'C'],
+    ['employee', empEmail(9),  '13800238009', '黄霞',        'D'],
+    ['employee', empEmail(10), '13800238010', '林峰',        'D'],
   ];
 
   const [companies] = await pool.query('SELECT id, code FROM companies');
   const codeToId = Object.fromEntries(companies.map(c => [c.code, c.id]));
 
   const userIds = {};
-  for (const [role, username, nickname, code] of users) {
+  for (const [role, username, phone, nickname, code] of users) {
     const password = username === 'admin' ? pwAdmin : pw;
     const company_id = code ? codeToId[code] : null;
     const [res] = await pool.query(
-      `INSERT IGNORE INTO users (username, password, nickname, role, company_id)
-       VALUES (?, ?, ?, ?, ?)`,
-      [username, password, nickname, role, company_id]
+      `INSERT IGNORE INTO users (username, phone, password, nickname, role, company_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [username, phone, password, nickname, role, company_id]
     );
     if (res.insertId) {
       userIds[username] = res.insertId;
@@ -69,6 +156,30 @@ async function seed() {
     }
   }
   console.log(`   ✅ ${users.length} 个用户`);
+
+  // INSERT IGNORE 不会更新已存在行的 phone；同时兼容旧版用户名（chef01、emp001）与新版邮箱登录名
+  const phoneRows = [
+    ['admin', '13900000001'],
+    ['chef01', '13900000002'],
+    ['chef02', '13900000003'],
+    ...Array.from({ length: 10 }, (_, i) => {
+      const n = i + 1;
+      return [`emp${String(n).padStart(3, '0')}`, `138001380${String(n).padStart(2, '0')}`];
+    }),
+    ['chef@demo.local', '13900010002'],
+    ['chef02@demo.local', '13900010003'],
+    ...Array.from({ length: 10 }, (_, i) => {
+      const n = i + 1;
+      return [empEmail(n), `138002380${String(n).padStart(2, '0')}`];
+    }),
+  ];
+  for (const [uname, ph] of phoneRows) {
+    try {
+      await pool.query('UPDATE users SET phone = ? WHERE username = ?', [ph, uname]);
+    } catch (e) {
+      console.warn(`   ⚠ 更新手机号失败 ${uname}:`, e.message);
+    }
+  }
 
   // ── 2. 菜品 ─────────────────────────────────────────────
   console.log('🍽 写入菜品...');
@@ -186,8 +297,7 @@ async function seed() {
 
   // ── 4. 订单 ─────────────────────────────────────────────
   console.log('📦 写入订单...');
-  const employees = ['emp001','emp002','emp003','emp004','emp005',
-                     'emp006','emp007','emp008','emp009','emp010'];
+  const employees = Array.from({ length: 10 }, (_, i) => empEmail(i + 1));
 
   // 过去 6 天：已完成订单
   let orderCount = 0;
@@ -310,12 +420,12 @@ async function seed() {
 
   // 许愿条目
   const wishItems = [
-    { user: 'emp001', dish: '麻辣小龙虾', desc: '夏天了，想吃小龙虾！', votes: 8 },
-    { user: 'emp002', dish: '烤鸭饭',      desc: '北京烤鸭配米饭，超级期待',  votes: 12 },
-    { user: 'emp003', dish: '酸菜鱼',      desc: '酸菜鱼汤鲜味美，强烈推荐',  votes: 6 },
-    { user: 'emp004', dish: '剁椒鱼头',    desc: '湘菜经典，非常下饭',        votes: 5 },
-    { user: 'emp005', dish: '佛跳墙',      desc: '高端食材，犒劳一下自己',    votes: 3 },
-    { user: 'emp006', dish: '椰汁西米露',  desc: '饭后甜品，清凉解腻',       votes: 10 },
+    { user: empEmail(1), dish: '麻辣小龙虾', desc: '夏天了，想吃小龙虾！', votes: 8 },
+    { user: empEmail(2), dish: '烤鸭饭',      desc: '北京烤鸭配米饭，超级期待',  votes: 12 },
+    { user: empEmail(3), dish: '酸菜鱼',      desc: '酸菜鱼汤鲜味美，强烈推荐',  votes: 6 },
+    { user: empEmail(4), dish: '剁椒鱼头',    desc: '湘菜经典，非常下饭',        votes: 5 },
+    { user: empEmail(5), dish: '佛跳墙',      desc: '高端食材，犒劳一下自己',    votes: 3 },
+    { user: empEmail(6), dish: '椰汁西米露',  desc: '饭后甜品，清凉解腻',       votes: 10 },
   ];
   for (const wi of wishItems) {
     const [wiRes] = await pool.query(
@@ -339,25 +449,25 @@ async function seed() {
   const [oldWish] = await pool.query(
     `INSERT IGNORE INTO wish_items (activity_id, user_id, dish_name, description, vote_count, is_adopted)
      VALUES (?, ?, ?, ?, ?, 1)`,
-    [actId2, userIds['emp001'], '番茄炒蛋', '经典家常菜，百吃不厌', 20]
+    [actId2, userIds[empEmail(1)], '番茄炒蛋', '经典家常菜，百吃不厌', 20]
   );
   await pool.query(
     `INSERT IGNORE INTO wish_items (activity_id, user_id, dish_name, description, vote_count)
      VALUES (?, ?, ?, ?, ?)`,
-    [actId2, userIds['emp003'], '糖醋鲤鱼', '酸甜开胃，节日首选', 8]
+    [actId2, userIds[empEmail(3)], '糖醋鲤鱼', '酸甜开胃，节日首选', 8]
   );
   console.log('   ✅ 2 个许愿活动，6 条愿望');
 
   // ── 6. 充值申请 ──────────────────────────────────────────
   console.log('💳 写入充值记录...');
   const recharges = [
-    { user: 'emp001', amount: 200, status: 'completed', remark: '本月餐费充值', review_note: '已到账', reviewer: 'admin' },
-    { user: 'emp002', amount: 100, status: 'completed', remark: '',             review_note: '已到账', reviewer: 'admin' },
-    { user: 'emp003', amount: 300, status: 'pending',   remark: '三个月餐费',   review_note: '',       reviewer: null },
-    { user: 'emp004', amount: 150, status: 'pending',   remark: '微信转账',     review_note: '',       reviewer: null },
-    { user: 'emp005', amount: 50,  status: 'rejected',  remark: '补充上月余额', review_note: '凭证模糊，请重新上传', reviewer: 'admin' },
-    { user: 'emp007', amount: 200, status: 'completed', remark: '',             review_note: '已到账', reviewer: 'admin' },
-    { user: 'emp009', amount: 100, status: 'pending',   remark: '支付宝转账',   review_note: '',       reviewer: null },
+    { user: empEmail(1), amount: 200, status: 'completed', remark: '本月餐费充值', review_note: '已到账', reviewer: 'admin' },
+    { user: empEmail(2), amount: 100, status: 'completed', remark: '',             review_note: '已到账', reviewer: 'admin' },
+    { user: empEmail(3), amount: 300, status: 'pending',   remark: '三个月餐费',   review_note: '',       reviewer: null },
+    { user: empEmail(4), amount: 150, status: 'pending',   remark: '微信转账',     review_note: '',       reviewer: null },
+    { user: empEmail(5), amount: 50,  status: 'rejected',  remark: '补充上月余额', review_note: '凭证模糊，请重新上传', reviewer: 'admin' },
+    { user: empEmail(7), amount: 200, status: 'completed', remark: '',             review_note: '已到账', reviewer: 'admin' },
+    { user: empEmail(9), amount: 100, status: 'pending',   remark: '支付宝转账',   review_note: '',       reviewer: null },
   ];
   for (const r of recharges) {
     const reviewedBy = r.reviewer ? userIds[r.reviewer] : null;
@@ -373,9 +483,11 @@ async function seed() {
 
   console.log('\n🎉 演示数据写入完成！\n');
   console.log('账号一览：');
-  console.log('  管理员  admin   / admin123');
-  console.log('  厨师    chef01  / 123456');
-  console.log('  员工    emp001~emp010 / 123456');
+  console.log('  管理员  admin / admin123  手机 13900000001');
+  console.log('  厨师    chef01 / 123456  手机 13900000002（旧）或 chef@demo.local / 13900010002（新）');
+  console.log('  员工    emp001~emp010 / 123456  手机 13800138001~10（旧）');
+  console.log('  员工    emp001@demo.local~ / 123456  手机 13800238001~10（新）');
+  console.log('\n推荐联调：emp001@demo.local / 13800238001；若库里仍是 emp001 则手机 13800138001；密码 123456；验证码 123456');
   await pool.end();
 }
 

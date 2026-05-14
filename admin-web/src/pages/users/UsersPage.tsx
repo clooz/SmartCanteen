@@ -41,7 +41,8 @@ const SYNC_EXAMPLE = `{
   "users": [
     {
       "ext_uid": "ding_uid_001",
-      "username": "13800000001",
+      "username": "zhangsan@company.com",
+      "phone": "13800000001",
       "nickname": "张三",
       "company_code": "A",
       "role": "employee",
@@ -79,6 +80,9 @@ export default function UsersPage() {
   const [loadError, setLoadError] = useState(false)
   const [userModalSubmitting, setUserModalSubmitting] = useState(false)
   const [pwdModalSubmitting, setPwdModalSubmitting] = useState(false)
+
+  const companyOptionLabel = (c: any) =>
+    `${c.name ?? ''}${Number(c.is_active) === 0 ? '（已停用）' : ''}`
 
   const fetchData = async (p = page, ps = pageSize) => {
     setLoading(true)
@@ -168,6 +172,7 @@ export default function UsersPage() {
     form.setFieldsValue({
       nickname: record.nickname, role: record.role,
       company_id: record.company_id, is_active: record.is_active === 1,
+      phone: record.phone || '',
     })
     setModalOpen(true)
   }
@@ -177,10 +182,22 @@ export default function UsersPage() {
     setUserModalSubmitting(true)
     try {
       if (editingId === null) {
-        await adminApi.createUser(values)
+        const payload = { ...values }
+        if (!payload.phone || !String(payload.phone).trim()) delete payload.phone
+        else payload.phone = String(payload.phone).trim()
+        await adminApi.createUser(payload)
         message.success('用户创建成功')
       } else {
-        await adminApi.updateUser(editingId, { ...values, is_active: values.is_active ? 1 : 0 })
+        const payload: Record<string, unknown> = {
+          nickname: values.nickname,
+          role: values.role,
+          company_id: values.company_id,
+          is_active: values.is_active ? 1 : 0,
+          phone: values.phone === undefined || values.phone === null
+            ? ''
+            : String(values.phone).trim(),
+        }
+        await adminApi.updateUser(editingId, payload)
         message.success('用户信息已更新')
       }
       setModalOpen(false)
@@ -249,10 +266,17 @@ export default function UsersPage() {
       },
     },
     {
-      title: '用户名',
+      title: '登录名',
       dataIndex: 'username',
       filteredValue: colUsername ? [colUsername] : null,
-      filterDropdown: textFilterDropdown('搜索用户名', (v) => { setColUsername(v); setPage(1) }),
+      filterDropdown: textFilterDropdown('搜索邮箱/登录名', (v) => { setColUsername(v); setPage(1) }),
+      ellipsis: true,
+    },
+    {
+      title: '手机',
+      dataIndex: 'phone',
+      width: 120,
+      render: (v: string | null) => v || '-',
     },
     {
       title: '昵称',
@@ -296,7 +320,7 @@ export default function UsersPage() {
             style={{ width: 220, marginBottom: 8 }}
             value={colCompanyId}
             onChange={(v) => setColCompanyId(v)}
-            options={companies.map((c: any) => ({ label: c.name, value: c.id }))}
+            options={companies.map((c: any) => ({ label: companyOptionLabel(c), value: c.id }))}
           />
           <Space>
             <Button type="primary" size="small" onClick={() => { setPage(1); confirm() }}>确定</Button>
@@ -395,8 +419,8 @@ export default function UsersPage() {
               onChange={(v) => { setFilterRole(v); setPage(1) }}>
               {Object.entries(ROLE_MAP).map(([k, v]) => <Option key={k} value={k}>{v.label}</Option>)}
             </Select>
-            <Text type="secondary" style={{ fontSize: 13 }}>用户名</Text>
-            <Input.Search key={`u-lk-${listFilterKey}-name`} placeholder="模糊" allowClear style={{ width: 140 }}
+            <Text type="secondary" style={{ fontSize: 13 }}>登录名</Text>
+            <Input.Search key={`u-lk-${listFilterKey}-name`} placeholder="邮箱模糊" allowClear style={{ width: 160 }}
               onSearch={(v) => { setColUsername(v || undefined); setPage(1) }} />
             <Text type="secondary" style={{ fontSize: 13 }}>昵称</Text>
             <Input.Search key={`u-lk-${listFilterKey}-nick`} placeholder="模糊" allowClear style={{ width: 140 }}
@@ -405,7 +429,7 @@ export default function UsersPage() {
             <Select showSearch optionFilterProp="label" placeholder="全部" allowClear style={{ width: 160 }}
               value={colCompanyId}
               onChange={(v) => { setColCompanyId(v); setPage(1) }}>
-              {companies.map((c: any) => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+              {companies.map((c: any) => <Option key={c.id} value={c.id}>{companyOptionLabel(c)}</Option>)}
             </Select>
             <Text type="secondary" style={{ fontSize: 13 }}>状态</Text>
             <Select placeholder="全部" allowClear style={{ width: 110 }}
@@ -415,7 +439,7 @@ export default function UsersPage() {
               <Option value={0}>禁用</Option>
             </Select>
             <Text type="secondary" style={{ fontSize: 13 }}>关键词</Text>
-            <Input.Search key={`u-lk-${listFilterKey}-kw`} placeholder="用户名或昵称" allowClear style={{ width: 180 }}
+            <Input.Search key={`u-lk-${listFilterKey}-kw`} placeholder="邮箱 / 昵称 / 手机" allowClear style={{ width: 200 }}
               onSearch={(v) => { setFilterKeyword(v || undefined); setPage(1) }} />
           </>
         }
@@ -434,7 +458,7 @@ export default function UsersPage() {
           columns={columns}
           loading={loading}
           locale={tableListLocale}
-          scroll={{ x: 900 }}
+          scroll={{ x: 1020 }}
           rowSelection={{
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys as number[]),
@@ -453,11 +477,22 @@ export default function UsersPage() {
         <Form form={form} layout="vertical">
           {!editingId && (
             <>
-              <Form.Item name="username" label="用户名" rules={[{ required: true }]}>
-                <Input />
+              <Form.Item
+                name="username"
+                label="邮箱（登录名）"
+                rules={[
+                  { required: true, message: '请输入登录名' },
+                  { min: 3, max: 191 },
+                ]}
+                extra="一般为邮箱，也可为管理员分配的其它登录名"
+              >
+                <Input placeholder="邮箱或登录名" />
               </Form.Item>
               <Form.Item name="password" label="初始密码" rules={[{ required: true, min: 6 }]}>
                 <Input.Password />
+              </Form.Item>
+              <Form.Item name="phone" label="手机号（可选）" rules={[{ pattern: /^$|^1\d{10}$/, message: '须为 11 位手机号' }]}>
+                <Input placeholder="用于短信验证码登录" maxLength={11} />
               </Form.Item>
             </>
           )}
@@ -471,9 +506,14 @@ export default function UsersPage() {
           </Form.Item>
           <Form.Item name="company_id" label="所属公司">
             <Select allowClear placeholder="厨师/管理员可不选">
-              {companies.map((c: any) => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+              {companies.map((c: any) => <Option key={c.id} value={c.id}>{companyOptionLabel(c)}</Option>)}
             </Select>
           </Form.Item>
+          {editingId && (
+            <Form.Item name="phone" label="手机号" rules={[{ pattern: /^$|^1\d{10}$/, message: '须为 11 位手机号或留空' }]}>
+              <Input placeholder="留空表示不修改" allowClear maxLength={11} />
+            </Form.Item>
+          )}
           {editingId && (
             <Form.Item name="is_active" label="账号状态" valuePropName="checked">
               <Switch checkedChildren="启用" unCheckedChildren="禁用" />
@@ -502,6 +542,7 @@ export default function UsersPage() {
               <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13 }}>
                 <li>将工作平台（钉钉、企微、飞书、自研HR）的人员信息按下方格式粘贴，点击「立即同步」。</li>
                 <li><b>ext_uid</b> 为外部平台的用户唯一ID，是日后自动对接的主键，强烈建议填写。</li>
+                <li><b>username</b> 登录名，常用邮箱；可选 <b>phone</b>（11 位）用于短信登录。</li>
                 <li>已存在的用户将被<b>更新</b>（不会修改密码），新用户默认密码 <b>123456</b>，首次登录请修改。</li>
                 <li>平台自动化对接时，直接向接口 <code>POST /api/admin/users/sync</code> 发送相同格式的 JSON 即可，无需手动操作此弹窗。</li>
               </ul>

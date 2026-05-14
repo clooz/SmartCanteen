@@ -2,6 +2,8 @@ const api = require('../../utils/api')
 const { syncTabBarSelected } = require('../../utils/tab-bar')
 const { getToken, getUserInfo, setUserInfo } = require('../../utils/storage')
 
+const BIND_TIP_KEY = 'sc_bind_phone_tip_shown'
+
 Page({
   data: {
     userInfo: {},
@@ -13,16 +15,41 @@ Page({
     oldPwd: '',
     newPwd: '',
     confirmPwd: '',
+    showBindSheet: false,
+    bindPhone: '',
+    bindCode: '',
+    bindCountdown: 0,
   },
+
+  _bindTimer: null,
 
   onLoad() {
     if (!getToken()) { wx.reLaunch({ url: '/pages/login/login' }); return }
     this.loadProfile()
   },
 
+  onUnload() {
+    if (this._bindTimer) clearInterval(this._bindTimer)
+  },
+
   onShow() {
     syncTabBarSelected()
     this.loadProfile()
+  },
+
+  maybeBindTip(userInfo) {
+    if (userInfo.has_phone) return
+    if (wx.getStorageSync(BIND_TIP_KEY)) return
+    wx.setStorageSync(BIND_TIP_KEY, 1)
+    wx.showModal({
+      title: '绑定手机号',
+      content: '绑定后可使用手机号验证码登录，是否前往「我的」页面绑定？',
+      confirmText: '去绑定',
+      cancelText: '稍后',
+      success: ({ confirm }) => {
+        if (confirm) this.goBindPhone()
+      },
+    })
   },
 
   async loadProfile() {
@@ -38,10 +65,10 @@ Page({
         avatarText: name.slice(-2),
         avatarUrl,
       })
+      this.maybeBindTip(userInfo)
     } catch {}
   },
 
-  /** 头像区域：直接选图上传 */
   async onChooseAvatar() {
     try {
       let tempPath = ''
@@ -71,7 +98,6 @@ Page({
     }
   },
 
-  /** 右侧入口：与头像点击互补，选昵称或头像 */
   onEditProfileTap() {
     wx.showActionSheet({
       itemList: ['修改昵称', '更换头像'],
@@ -88,6 +114,80 @@ Page({
 
   goMyOrders() {
     wx.navigateTo({ url: '/pages/my-orders/my-orders' })
+  },
+
+  goBindPhone() {
+    this.setData({
+      showBindSheet: true,
+      bindPhone: '',
+      bindCode: '',
+      bindCountdown: 0,
+    })
+  },
+
+  hideBindSheet() {
+    this.setData({ showBindSheet: false })
+    if (this._bindTimer) {
+      clearInterval(this._bindTimer)
+      this._bindTimer = null
+    }
+  },
+
+  onBindPhoneInput(e) {
+    this.setData({ bindPhone: e.detail.value })
+  },
+
+  onBindCodeInput(e) {
+    this.setData({ bindCode: e.detail.value })
+  },
+
+  startBindCountdown() {
+    if (this._bindTimer) clearInterval(this._bindTimer)
+    this.setData({ bindCountdown: 60 })
+    this._bindTimer = setInterval(() => {
+      const n = this.data.bindCountdown - 1
+      if (n <= 0) {
+        clearInterval(this._bindTimer)
+        this._bindTimer = null
+        this.setData({ bindCountdown: 0 })
+      } else {
+        this.setData({ bindCountdown: n })
+      }
+    }, 1000)
+  },
+
+  async sendBindSms() {
+    const { bindPhone, bindCountdown } = this.data
+    if (bindCountdown > 0) return
+    const p = String(bindPhone).replace(/\D/g, '')
+    if (!/^1\d{10}$/.test(p)) {
+      wx.showToast({ title: '请输入正确手机号', icon: 'none' })
+      return
+    }
+    try {
+      await api.sendBindPhoneCode({ phone: p })
+      wx.showToast({ title: '验证码已发送', icon: 'success' })
+      this.startBindCountdown()
+    } catch {}
+  },
+
+  async saveBindPhone() {
+    const { bindPhone, bindCode } = this.data
+    const p = String(bindPhone).replace(/\D/g, '')
+    if (!/^1\d{10}$/.test(p)) {
+      wx.showToast({ title: '请输入正确手机号', icon: 'none' })
+      return
+    }
+    if (!String(bindCode).trim()) {
+      wx.showToast({ title: '请输入验证码', icon: 'none' })
+      return
+    }
+    try {
+      await api.bindPhone({ phone: p, code: String(bindCode).trim() })
+      wx.showToast({ title: '绑定成功', icon: 'success' })
+      this.hideBindSheet()
+      this.loadProfile()
+    } catch {}
   },
 
   goEditNickname() {

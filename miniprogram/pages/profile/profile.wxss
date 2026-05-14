@@ -76,6 +76,16 @@
   border-radius: 24rpx;
 }
 
+.user-sub {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.user-sub--warn {
+  color: rgba(254, 243, 199, 0.95);
+}
+
 .user-edit {
   padding: 8rpx;
 }
@@ -267,4 +277,35 @@
   font-size: 28rpx;
   color: #111827;
   box-sizing: border-box;
+}
+
+.bind-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16rpx;
+}
+
+.bind-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.bind-sms {
+  flex-shrink: 0;
+  padding: 16rpx 20rpx;
+  font-size: 24rpx;
+  color: #0f766e;
+  font-weight: 600;
+  background: rgba(13, 148, 136, 0.1);
+  border-radius: 12rpx;
+  margin-bottom: 4rpx;
+}
+
+.bind-sms.disabled {
+  color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.menu-icon.phone {
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
 }

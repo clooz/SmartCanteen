@@ -6,13 +6,20 @@ const CREATE_TABLES = [
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL COMMENT '公司名称',
     code VARCHAR(20) NOT NULL UNIQUE COMMENT '公司编码，如 A/B/C/D',
+    contact_name VARCHAR(50) DEFAULT NULL COMMENT '联系人',
+    contact_phone VARCHAR(30) DEFAULT NULL COMMENT '联系电话',
+    address VARCHAR(255) DEFAULT NULL COMMENT '办公地址',
+    remark VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    credit_code VARCHAR(32) DEFAULT NULL COMMENT '统一社会信用代码',
+    is_active TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   ) COMMENT='公司表'`,
 
-  // 用户表
+  // 用户表（username 存登录名，常用邮箱；phone 可空唯一）
   `CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名/手机号',
+    username VARCHAR(191) NOT NULL UNIQUE COMMENT '登录名（常用邮箱）',
+    phone VARCHAR(20) DEFAULT NULL COMMENT '绑定手机号',
     password VARCHAR(255) NOT NULL COMMENT 'bcrypt 加密密码',
     nickname VARCHAR(50) DEFAULT '' COMMENT '昵称',
     avatar VARCHAR(255) DEFAULT '' COMMENT '头像URL',
@@ -24,8 +31,21 @@ const CREATE_TABLES = [
     synced_at DATETIME DEFAULT NULL COMMENT '最近一次从外部平台同步的时间',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_users_phone (phone),
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
   ) COMMENT='用户表'`,
+
+  // 短信/邮箱验证码（登录、绑定、找回密码等）
+  `CREATE TABLE IF NOT EXISTS sms_verifications (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    target VARCHAR(191) NOT NULL COMMENT '手机号或邮箱',
+    channel ENUM('sms', 'email') NOT NULL DEFAULT 'sms',
+    purpose VARCHAR(32) NOT NULL COMMENT 'login/bind_phone/forgot_sms/forgot_email',
+    code_hash VARCHAR(255) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_target_purpose_created (target(64), channel, purpose, created_at)
+  ) COMMENT='验证码记录'`,
 
   // 菜品表
   `CREATE TABLE IF NOT EXISTS dishes (
@@ -275,6 +295,61 @@ async function migrateSchema() {
          ADD COLUMN synced_at DATETIME DEFAULT NULL COMMENT '最近同步时间' AFTER sync_source`
     );
   }
+
+  const userPhoneCol = await pool.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'phone'`
+  );
+  if (!userPhoneCol[0].length) {
+    console.log('🔄 迁移：users 增加 phone、username 扩长 …');
+    try {
+      await pool.query('ALTER TABLE users MODIFY COLUMN username VARCHAR(191) NOT NULL COMMENT \'登录名（常用邮箱）\'');
+    } catch (e) {
+      console.warn('   ⚠ username 扩长跳过:', e.message);
+    }
+    await pool.query(
+      `ALTER TABLE users ADD COLUMN phone VARCHAR(20) DEFAULT NULL COMMENT '绑定手机号' AFTER username,
+       ADD UNIQUE KEY uk_users_phone (phone)`
+    );
+  }
+
+  const [smsTable] = await pool.query(
+    `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sms_verifications'`
+  );
+  if (!smsTable.length) {
+    console.log('🔄 迁移：创建 sms_verifications …');
+    await pool.query(`
+      CREATE TABLE sms_verifications (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        target VARCHAR(191) NOT NULL COMMENT '手机号或邮箱',
+        channel ENUM('sms', 'email') NOT NULL DEFAULT 'sms',
+        purpose VARCHAR(32) NOT NULL COMMENT 'login/bind_phone/forgot_sms/forgot_email',
+        code_hash VARCHAR(255) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_target_purpose_created (target(64), channel, purpose, created_at)
+      ) COMMENT='验证码记录'
+    `);
+  }
+
+  const [companyExtraCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'contact_name'`
+  );
+  if (!companyExtraCols.length) {
+    console.log('🔄 迁移：companies 增加联系人、地址、信用代码等字段 …');
+    await pool.query(`
+      ALTER TABLE companies
+        ADD COLUMN contact_name VARCHAR(50) DEFAULT NULL COMMENT '联系人' AFTER code,
+        ADD COLUMN contact_phone VARCHAR(30) DEFAULT NULL COMMENT '联系电话' AFTER contact_name,
+        ADD COLUMN address VARCHAR(255) DEFAULT NULL COMMENT '办公地址' AFTER contact_phone,
+        ADD COLUMN remark VARCHAR(500) DEFAULT NULL COMMENT '备注' AFTER address,
+        ADD COLUMN credit_code VARCHAR(32) DEFAULT NULL COMMENT '统一社会信用代码' AFTER remark,
+        ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用' AFTER credit_code
+    `);
+    console.log('   ✅ companies 扩展字段已添加');
+  }
 }
 
 async function migrateOrderingWindow() {
@@ -359,17 +434,75 @@ async function initDatabase() {
 
 // 初始化基础数据（公司 + 默认管理员）
 async function seedInitialData() {
-  // 写入默认公司（如已存在则跳过）
   const defaultCompanies = [
-    { name: 'A公司', code: 'A' },
-    { name: 'B公司', code: 'B' },
-    { name: 'C公司', code: 'C' },
-    { name: 'D公司', code: 'D' },
+    {
+      name: 'A公司',
+      code: 'A',
+      contact_name: '王明',
+      contact_phone: '010-88880101',
+      address: '北京市海淀区科技园路1号A座3层',
+      remark: '演示数据：研发中心',
+      credit_code: '91110108MA01DEMO0A',
+      is_active: 1,
+    },
+    {
+      name: 'B公司',
+      code: 'B',
+      contact_name: '李华',
+      contact_phone: '021-66660202',
+      address: '上海市浦东新区制造大道88号',
+      remark: '演示数据：生产制造基地',
+      credit_code: '91310115MA01DEMO0B',
+      is_active: 1,
+    },
+    {
+      name: 'C公司',
+      code: 'C',
+      contact_name: '陈静',
+      contact_phone: '0755-88880303',
+      address: '深圳市南山区粤海街道软件园二期',
+      remark: '演示数据：华南分部',
+      credit_code: '91440300MA01DEMO0C',
+      is_active: 1,
+    },
+    {
+      name: 'D公司',
+      code: 'D',
+      contact_name: '赵磊',
+      contact_phone: '028-88880404',
+      address: '成都市高新区天府大道中段',
+      remark: '演示数据：西南运营中心',
+      credit_code: '91510100MA01DEMO0D',
+      is_active: 1,
+    },
   ];
   for (const c of defaultCompanies) {
     await pool.query(
-      'INSERT IGNORE INTO companies (name, code) VALUES (?, ?)',
-      [c.name, c.code]
+      `INSERT IGNORE INTO companies (name, code, contact_name, contact_phone, address, remark, credit_code, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        c.name,
+        c.code,
+        c.contact_name,
+        c.contact_phone,
+        c.address,
+        c.remark,
+        c.credit_code,
+        c.is_active,
+      ]
+    );
+    await pool.query(
+      `UPDATE companies SET contact_name = ?, contact_phone = ?, address = ?, remark = ?, credit_code = ?, is_active = ?
+       WHERE code = ?`,
+      [
+        c.contact_name,
+        c.contact_phone,
+        c.address,
+        c.remark,
+        c.credit_code,
+        c.is_active,
+        c.code,
+      ]
     );
   }
 
