@@ -90,7 +90,7 @@
         data-index="{{index}}"
       >
         {{item.name}}
-        <van-icon wx:if="{{selectedCompanyIndex === index}}" name="success" color="#DC2626" size="36rpx" />
+        <van-icon wx:if="{{selectedCompanyIndex === index}}" name="success" color="#0F766E" size="36rpx" />
       </view>
     </scroll-view>
   </van-popup>

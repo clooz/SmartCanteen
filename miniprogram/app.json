@@ -12,15 +12,16 @@
   ],
   "window": {
     "backgroundTextStyle": "dark",
-    "navigationBarBackgroundColor": "#0891B2",
+    "navigationBarBackgroundColor": "#F0F4F8",
     "navigationBarTitleText": "智慧食堂",
-    "navigationBarTextStyle": "white",
-    "backgroundColor": "#F0FDFF",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F0F4F8",
     "enablePullDownRefresh": false
   },
   "tabBar": {
-    "color": "#94A3B8",
-    "selectedColor": "#0891B2",
+    "custom": true,
+    "color": "#9CA3AF",
+    "selectedColor": "#0F766E",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "white",
     "list": [

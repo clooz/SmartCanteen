@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const { syncTabBarSelected } = require('../../utils/tab-bar')
 const { getToken } = require('../../utils/storage')
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -26,9 +27,12 @@ Page({
     lunchDishes: [],
     menuDateLine: formatZhMenuDate(),
     totalDishCount: 0,
+    breakfastExpanded: true,
+    lunchExpanded: true,
   },
 
   onShow() {
+    syncTabBarSelected()
     this.checkLoginAndLoad()
     this.startAutoRefresh()
   },
@@ -147,5 +151,14 @@ Page({
 
   goProfile() {
     wx.switchTab({ url: '/pages/profile/profile' })
+  },
+
+  onToggleMeal(e) {
+    const meal = e.currentTarget.dataset.meal
+    if (meal === 'breakfast') {
+      this.setData({ breakfastExpanded: !this.data.breakfastExpanded })
+    } else if (meal === 'lunch') {
+      this.setData({ lunchExpanded: !this.data.lunchExpanded })
+    }
   },
 })

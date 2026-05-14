@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const { syncTabBarSelected } = require('../../utils/tab-bar')
 const { getToken, getUserInfo, setUserInfo } = require('../../utils/storage')
 
 Page({
@@ -19,7 +20,10 @@ Page({
     this.loadProfile()
   },
 
-  onShow() { this.loadProfile() },
+  onShow() {
+    syncTabBarSelected()
+    this.loadProfile()
+  },
 
   async loadProfile() {
     try {

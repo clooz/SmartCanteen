@@ -2,7 +2,7 @@
   <view class="head-row">
     <view class="filter-bar" bindtap="openFilterSheet">
       <view class="filter-bar-left">
-        <van-icon name="filter-o" size="34rpx" color="#0891B2" />
+        <van-icon name="filter-o" size="34rpx" color="#0F766E" />
         <text class="filter-bar-label">筛选</text>
         <text class="filter-bar-sum">{{filterSummaryText}}</text>
       </view>
@@ -12,7 +12,7 @@
   </view>
 
   <view wx:if="{{loading}}" class="loading-wrap">
-    <van-loading type="spinner" color="#0891B2" size="48rpx" />
+    <van-loading type="spinner" color="#14B8A6" size="48rpx" />
   </view>
 
   <view wx:elif="{{!orders.length}}" class="empty">
@@ -107,7 +107,7 @@
           bindtap="onDraftStatus"
         >
           <text>{{item.label}}</text>
-          <van-icon wx:if="{{draftStatus === item.value}}" name="success" size="36rpx" color="#0891B2" />
+          <van-icon wx:if="{{draftStatus === item.value}}" name="success" size="36rpx" color="#0F766E" />
         </view>
       </view>
 
@@ -121,7 +121,7 @@
           bindtap="onDraftMeal"
         >
           <text>{{item.label}}</text>
-          <van-icon wx:if="{{draftMeal === item.value}}" name="success" size="36rpx" color="#0891B2" />
+          <van-icon wx:if="{{draftMeal === item.value}}" name="success" size="36rpx" color="#0F766E" />
         </view>
       </view>
 
@@ -135,7 +135,7 @@
           bindtap="onDraftRange"
         >
           <text>{{item.label}}</text>
-          <van-icon wx:if="{{draftRange === item.value}}" name="success" size="36rpx" color="#0891B2" />
+          <van-icon wx:if="{{draftRange === item.value}}" name="success" size="36rpx" color="#0F766E" />
         </view>
       </view>
     </view>

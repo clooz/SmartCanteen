@@ -1,47 +1,35 @@
-/* ===== SmartCanteen 全局样式 =====
-   设计系统：企业蓝白配色（UI Skill · Trust & Authority）
-   Primary:    #0891B2  青蓝
-   PrimaryDark:#0369A1  深蓝
-   Secondary:  #22D3EE  亮青
-   Background: #F0FDFF  近白蓝
-   Surface:    #FFFFFF
-   Text:       #164E63  深蓝文字
-   TextMuted:  #6B7280
-   Border:     #CFFAFE
-   ================================ */
+/* ===== SmartCanteen 全局设计系统（与今日菜单页统一）=====
+   冷灰底 + Teal 主色，克制渐变与投影 */
 
 page {
-  --color-primary:       #0891B2;
-  --color-primary-dark:  #0369A1;
-  --color-primary-light: #E0F7FA;
-  --color-secondary:     #22D3EE;
-  --color-bg:            #F0FDFF;
-  --color-surface:       #FFFFFF;
-  --color-text:          #164E63;
-  --color-text-secondary:#6B7280;
-  --color-border:        #CFFAFE;
-  --color-success:       #22C55E;
-  --color-success-light: #DCFCE7;
-  --color-warning:       #D97706;
-  --color-warning-light: #FEF3C7;
-  --color-error:         #EF4444;
-  --color-error-light:   #FEE2E2;
+  --color-primary: #0f766e;
+  --color-primary-mid: #14b8a6;
+  --color-primary-light: rgba(13, 148, 136, 0.1);
+  --color-primary-dark: #0d9488;
+  --color-bg: #f0f4f8;
+  --color-bg-soft: #eef1f6;
+  --color-surface: #ffffff;
+  --color-text: #111827;
+  --color-text-secondary: #6b7280;
+  --color-border: rgba(15, 23, 42, 0.06);
+  --color-border-strong: #e5e7eb;
+  --color-success: #16a34a;
+  --color-success-light: #dcfce7;
+  --color-warning: #d97706;
+  --color-warning-light: #fef3c7;
+  --color-error: #dc2626;
+  --color-error-light: #fee2e2;
+  --gradient-primary: linear-gradient(125deg, #5eead4 0%, #2dd4bf 38%, #14b8a6 72%, #0d9488 100%);
+  --gradient-hero: linear-gradient(155deg, #5eead4 0%, #2dd4bf 32%, #14b8a6 62%, #0d9488 100%);
 
-  --radius-sm:   8rpx;
-  --radius-md:   16rpx;
-  --radius-lg:   24rpx;
-  --radius-xl:   32rpx;
+  --radius-sm: 8rpx;
+  --radius-md: 16rpx;
+  --radius-lg: 20rpx;
+  --radius-xl: 24rpx;
   --radius-full: 9999rpx;
 
-  --shadow-sm: 0 2rpx 8rpx  rgba(8, 145, 178, 0.08);
-  --shadow-md: 0 4rpx 16rpx rgba(8, 145, 178, 0.12);
-  --shadow-lg: 0 8rpx 32rpx rgba(8, 145, 178, 0.16);
-
-  --spacing-xs: 8rpx;
-  --spacing-sm: 16rpx;
-  --spacing-md: 24rpx;
-  --spacing-lg: 32rpx;
-  --spacing-xl: 48rpx;
+  --shadow-sm: 0 2rpx 12rpx rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4rpx 20rpx rgba(15, 23, 42, 0.06);
 
   background-color: var(--color-bg);
   color: var(--color-text);
@@ -50,38 +38,55 @@ page {
   line-height: 1.6;
 }
 
-/* 列表滚动条：业务页内纵向滚动统一用 scroll-view 的 enhanced + show-scrollbar=false
-  （微信文档要求二者同开，垂直滚动条才可隐藏；不影响触摸滑动与惯性滚动）。 */
+.flex {
+  display: flex;
+}
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+.items-center {
+  align-items: center;
+}
+.justify-center {
+  justify-content: center;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.flex-1 {
+  flex: 1;
+}
+.text-center {
+  text-align: center;
+}
+.text-primary {
+  color: var(--color-primary);
+}
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+.font-bold {
+  font-weight: 700;
+}
+.font-medium {
+  font-weight: 500;
+}
 
-/* ===== 工具类 ===== */
-.flex            { display: flex; }
-.flex-col        { display: flex; flex-direction: column; }
-.items-center    { align-items: center; }
-.justify-center  { justify-content: center; }
-.justify-between { justify-content: space-between; }
-.flex-1          { flex: 1; }
-.text-center     { text-align: center; }
-.text-primary    { color: var(--color-primary); }
-.text-secondary  { color: var(--color-text-secondary); }
-.font-bold       { font-weight: 700; }
-.font-medium     { font-weight: 500; }
-
-/* ===== 通用卡片 ===== */
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  border: 1rpx solid var(--color-border);
   overflow: hidden;
 }
 
-/* ===== 页面容器 ===== */
 .page-container {
   min-height: 100vh;
   background: var(--color-bg);
   padding-bottom: 32rpx;
 }
 
-/* ===== 状态徽标 ===== */
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -90,34 +95,42 @@ page {
   font-size: 24rpx;
   font-weight: 500;
 }
-.status-badge.pending { background: var(--color-warning-light); color: var(--color-warning); }
-.status-badge.success { background: var(--color-success-light); color: var(--color-success); }
-.status-badge.error   { background: var(--color-error-light);   color: var(--color-error); }
+.status-badge.pending {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}
+.status-badge.success {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+.status-badge.error {
+  background: var(--color-error-light);
+  color: var(--color-error);
+}
 
-/* ===== 主按钮 ===== */
 .btn-primary {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0891B2, #0369A1);
+  background: var(--gradient-primary);
   color: #fff;
   border-radius: var(--radius-full);
   font-size: 32rpx;
   font-weight: 600;
   height: 96rpx;
-  letter-spacing: 2rpx;
-  box-shadow: var(--shadow-md);
+  letter-spacing: 1rpx;
+  box-shadow: 0 10rpx 28rpx rgba(13, 148, 136, 0.22);
 }
-.btn-primary:active { opacity: 0.88; }
+.btn-primary:active {
+  opacity: 0.9;
+}
 
-/* ===== 分割线 ===== */
 .divider {
   height: 1rpx;
-  background: var(--color-border);
+  background: var(--color-border-strong);
   margin: 0 32rpx;
 }
 
-/* ===== 空状态 ===== */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -126,10 +139,17 @@ page {
   padding: 80rpx 40rpx;
   color: var(--color-text-secondary);
 }
-.empty-state .empty-icon  { font-size: 80rpx; margin-bottom: 24rpx; opacity: 0.4; }
-.empty-state .empty-text  { font-size: 28rpx; text-align: center; line-height: 1.8; }
+.empty-state .empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
+  opacity: 0.4;
+}
+.empty-state .empty-text {
+  font-size: 28rpx;
+  text-align: center;
+  line-height: 1.8;
+}
 
-/* ===== 加载中 ===== */
 .loading-wrap {
   display: flex;
   align-items: center;

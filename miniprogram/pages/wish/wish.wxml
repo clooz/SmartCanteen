@@ -1,14 +1,14 @@
 <view class="page">
   <!-- 自定义顶区：安全区 + 标题 + 搜索 + 筛选 -->
-  <view class="hero" style="padding-top: {{statusBarHeight}}px;">
+  <view class="hero" style="padding-top: {{heroPaddingTop}}px;">
     <view class="hero-inner">
-      <view class="hero-head">
+      <view class="hero-head" style="min-height: {{capsuleHeight}}px;">
         <text class="hero-title">许愿活动</text>
       </view>
 
       <view class="toolbar-row">
         <view class="search-box">
-          <van-icon class="search-ico" name="search" size="30rpx" color="rgba(22,78,99,0.45)" />
+          <van-icon class="search-ico" name="search" size="30rpx" color="rgba(15,23,42,0.35)" />
           <input
             class="search-input"
             type="text"
@@ -25,7 +25,7 @@
         <picker mode="selector" range="{{statusFilterRange}}" range-key="label" value="{{filterIndex}}" bindchange="onFilterPick">
           <view class="filter-trigger">
             <text class="filter-trigger-text">{{statusFilterRange[filterIndex].label}}</text>
-            <van-icon name="arrow-down" size="24rpx" color="rgba(22,78,99,0.5)" />
+            <van-icon name="arrow-down" size="24rpx" color="rgba(15,23,42,0.4)" />
           </view>
         </picker>
       </view>
@@ -34,7 +34,7 @@
 
   <view class="body">
     <view wx:if="{{loading}}" class="loading-wrap">
-      <van-loading type="spinner" color="#0891B2" size="48rpx" />
+      <van-loading type="spinner" color="#14B8A6" size="48rpx" />
       <text class="loading-text">加载中</text>
     </view>
 

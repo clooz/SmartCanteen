@@ -4,7 +4,7 @@
   </view>
 
   <view wx:if="{{loading}}" class="loading-wrap">
-    <van-loading type="spinner" color="#0891B2" size="48rpx" />
+    <van-loading type="spinner" color="#14B8A6" size="48rpx" />
     <text class="loading-text">加载菜单中…</text>
   </view>
 

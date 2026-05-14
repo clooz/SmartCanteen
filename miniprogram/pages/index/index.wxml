@@ -35,7 +35,7 @@
 
   <view wx:if="{{loading}}" class="loading-wrap">
     <view class="loading-card">
-      <van-loading type="spinner" color="#0891B2" size="44rpx" />
+      <van-loading type="spinner" color="#14B8A6" size="44rpx" />
       <text class="loading-text">加载菜品中…</text>
     </view>
   </view>
@@ -59,16 +59,29 @@
   <scroll-view wx:elif="{{hasMenu}}" scroll-y class="menu-scroll" enhanced show-scrollbar="{{false}}" enable-passive>
     <view wx:if="{{breakfastDishes.length > 0}}" class="meal-block meal-block--bf">
       <van-sticky offset-top="0">
-        <view class="section-cap section-cap--bf">
+        <view
+          class="section-cap section-cap--bf"
+          hover-class="section-cap--pressed"
+          hover-stay-time="60"
+          bindtap="onToggleMeal"
+          data-meal="breakfast"
+        >
           <view class="section-cap-icon">☀️</view>
           <view class="section-cap-mid">
             <text class="section-cap-kicker">晨间</text>
             <text class="section-cap-title">早餐</text>
           </view>
           <view class="section-cap-badge">{{breakfastDishes.length}} 道</view>
+          <view class="section-cap-chevron">
+            <van-icon
+              name="{{breakfastExpanded ? 'arrow-up' : 'arrow-down'}}"
+              size="32rpx"
+              color="#94A3B8"
+            />
+          </view>
         </view>
       </van-sticky>
-      <view class="dish-stack">
+      <view wx:if="{{breakfastExpanded}}" class="dish-stack">
         <view
           wx:for="{{breakfastDishes}}"
           wx:key="id"
@@ -102,16 +115,29 @@
 
     <view wx:if="{{lunchDishes.length > 0}}" class="meal-block meal-block--lunch">
       <van-sticky offset-top="0">
-        <view class="section-cap section-cap--lunch">
+        <view
+          class="section-cap section-cap--lunch"
+          hover-class="section-cap--pressed"
+          hover-stay-time="60"
+          bindtap="onToggleMeal"
+          data-meal="lunch"
+        >
           <view class="section-cap-icon">🌤</view>
           <view class="section-cap-mid">
             <text class="section-cap-kicker">午间</text>
             <text class="section-cap-title">午餐</text>
           </view>
           <view class="section-cap-badge">{{lunchDishes.length}} 道</view>
+          <view class="section-cap-chevron">
+            <van-icon
+              name="{{lunchExpanded ? 'arrow-up' : 'arrow-down'}}"
+              size="32rpx"
+              color="#94A3B8"
+            />
+          </view>
         </view>
       </van-sticky>
-      <view class="dish-stack">
+      <view wx:if="{{lunchExpanded}}" class="dish-stack">
         <view
           wx:for="{{lunchDishes}}"
           wx:key="id"

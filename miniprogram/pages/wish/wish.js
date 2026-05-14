@@ -1,4 +1,6 @@
 const api = require('../../utils/api')
+const { syncTabBarSelected } = require('../../utils/tab-bar')
+const { getHeroInset } = require('../../utils/hero-inset')
 const { getToken } = require('../../utils/storage')
 
 function formatCountdown(endAt) {
@@ -25,7 +27,8 @@ function formatDateShort(str) {
 
 Page({
   data: {
-    statusBarHeight: 20,
+    heroPaddingTop: 20,
+    capsuleHeight: 32,
     filterTab: 'all',
     filterIndex: 0,
     statusFilterRange: [
@@ -42,19 +45,15 @@ Page({
 
   onLoad() {
     if (!getToken()) { wx.reLaunch({ url: '/pages/login/login' }); return }
-    const sys = wx.getSystemInfoSync()
-    let statusBarHeight = sys.statusBarHeight || 20
-    try {
-      const menu = wx.getMenuButtonBoundingClientRect()
-      if (menu && menu.top > 0) {
-        statusBarHeight = menu.top
-      }
-    } catch (_) {}
-    this.setData({ statusBarHeight })
+    const { heroPaddingTop, capsuleHeight } = getHeroInset()
+    this.setData({ heroPaddingTop, capsuleHeight })
     this.loadActivities()
   },
 
-  onShow() { this.loadActivities() },
+  onShow() {
+    syncTabBarSelected()
+    this.loadActivities()
+  },
 
   onUnload() {
     if (this._searchTimer) clearTimeout(this._searchTimer)

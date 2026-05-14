@@ -1,0 +1,29 @@
+<van-tabbar
+  active="{{ active }}"
+  active-color="#0F766E"
+  inactive-color="#9CA3AF"
+  border="{{ false }}"
+  safe-area-inset-bottom="{{ true }}"
+  custom-class="app-tabbar"
+>
+  <van-tabbar-item
+    icon="records"
+    url="/pages/index/index"
+    link-type="switchTab"
+  >今日菜单</van-tabbar-item>
+  <van-tabbar-item
+    icon="gift-o"
+    url="/pages/wish/wish"
+    link-type="switchTab"
+  >许愿</van-tabbar-item>
+  <van-tabbar-item
+    icon="gold-coin-o"
+    url="/pages/recharge/recharge"
+    link-type="switchTab"
+  >充值</van-tabbar-item>
+  <van-tabbar-item
+    icon="user-o"
+    url="/pages/profile/profile"
+    link-type="switchTab"
+  >我的</van-tabbar-item>
+</van-tabbar>

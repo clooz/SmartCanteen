@@ -1,8 +1,8 @@
 <view class="page">
   <!-- 自定义顶区：安全区 + 标题 + 副标题（与许愿列表 hero 一致） -->
-  <view class="hero" style="padding-top: {{statusBarHeight}}px;">
+  <view class="hero" style="padding-top: {{heroPaddingTop}}px;">
     <view class="hero-inner">
-      <view class="hero-head">
+      <view class="hero-head" style="min-height: {{capsuleHeight}}px;">
         <text class="hero-title">申请充值</text>
         <text class="hero-sub">上传转账凭证，管理员审核后到账</text>
       </view>

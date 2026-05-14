@@ -12,7 +12,7 @@
 
     <!-- 加载中 -->
     <view wx:if="{{loading}}" class="loading-wrap">
-      <van-loading type="spinner" color="#DC2626" size="48rpx" />
+      <van-loading type="spinner" color="#14B8A6" size="48rpx" />
     </view>
 
     <!-- 空状态 -->
@@ -79,7 +79,7 @@
 
         <!-- 评论展开区 -->
         <view wx:if="{{expandedId === item.id}}" class="comment-section">
-          <van-loading wx:if="{{commentLoading}}" type="spinner" color="#DC2626" size="36rpx" style="display:block;padding:24rpx 0;text-align:center;" />
+          <van-loading wx:if="{{commentLoading}}" type="spinner" color="#14B8A6" size="36rpx" style="display:block;padding:24rpx 0;text-align:center;" />
 
           <view wx:elif="{{comments.length === 0}}" class="no-comments">
             {{isActive ? '暂无评论，快来说说你的想法' : '暂无评论'}}

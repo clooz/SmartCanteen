@@ -1,9 +1,12 @@
 const api = require('../../utils/api')
+const { getHeroInset } = require('../../utils/hero-inset')
+const { syncTabBarSelected } = require('../../utils/tab-bar')
 const { getToken } = require('../../utils/storage')
 
 Page({
   data: {
-    statusBarHeight: 20,
+    heroPaddingTop: 20,
+    capsuleHeight: 32,
     amount: '',
     proofImage: '',
     remark: '',
@@ -13,15 +16,12 @@ Page({
 
   onLoad() {
     if (!getToken()) { wx.reLaunch({ url: '/pages/login/login' }); return }
-    const sys = wx.getSystemInfoSync()
-    let statusBarHeight = sys.statusBarHeight || 20
-    try {
-      const menu = wx.getMenuButtonBoundingClientRect()
-      if (menu && menu.top > 0) {
-        statusBarHeight = menu.top
-      }
-    } catch (_) {}
-    this.setData({ statusBarHeight })
+    const { heroPaddingTop, capsuleHeight } = getHeroInset()
+    this.setData({ heroPaddingTop, capsuleHeight })
+  },
+
+  onShow() {
+    syncTabBarSelected()
   },
 
   onAmountInput(e) { this.setData({ amount: e.detail.value }) },
