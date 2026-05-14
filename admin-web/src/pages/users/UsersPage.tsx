@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Table, Button, Tag, Space, Modal, Form, Input, Select,
-  Switch, message, Typography, Tooltip, Alert, App,
+  Switch, message, Typography, Tooltip, Alert, App, Avatar,
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, KeyOutlined, ReloadOutlined, CloudSyncOutlined,
@@ -230,6 +230,24 @@ export default function UsersPage() {
   const roleOptions = Object.entries(ROLE_MAP).map(([value, { label }]) => ({ label, value }))
 
   const columns = [
+    {
+      title: '头像',
+      dataIndex: 'avatar',
+      width: 72,
+      align: 'center' as const,
+      render: (_: string | null, record: any) => {
+        const url = (record.avatar && String(record.avatar).trim()) || ''
+        const nick = String(record.nickname || record.username || '?').trim() || '?'
+        const src = url || undefined
+        return (
+          <Tooltip title={url || '未设置头像'}>
+            <Avatar size={40} src={src}>
+              {!url ? nick.slice(0, 1) : undefined}
+            </Avatar>
+          </Tooltip>
+        )
+      },
+    },
     {
       title: '用户名',
       dataIndex: 'username',

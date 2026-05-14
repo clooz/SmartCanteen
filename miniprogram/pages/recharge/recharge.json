@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "申请充值",
+  "navigationStyle": "custom",
   "usingComponents": {
     "van-icon": "@vant/weapp/icon/index",
     "van-loading": "@vant/weapp/loading/index"

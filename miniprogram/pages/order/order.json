@@ -1,6 +1,5 @@
 {
-  "navigationStyle": "custom",
-  "enablePullDownRefresh": true,
+  "navigationBarTitleText": "下单",
   "usingComponents": {
     "van-icon": "@vant/weapp/icon/index",
     "van-loading": "@vant/weapp/loading/index"

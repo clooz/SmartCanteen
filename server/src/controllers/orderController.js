@@ -174,12 +174,34 @@ const getOrderById = async (req, res) => {
 
 // 用户查看自己的订单列表
 const getMyOrders = async (req, res) => {
-  const { page = 1, page_size = 10, status } = req.query;
+  const {
+    page = 1,
+    page_size = 10,
+    status,
+    meal_type: mealType,
+    start_date,
+    end_date,
+  } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(page_size);
 
-  let where = ['o.user_id = ?'];
-  let params = [req.user.id];
-  if (status) { where.push('o.status = ?'); params.push(status); }
+  const where = ['o.user_id = ?'];
+  const params = [req.user.id];
+  if (status) {
+    where.push('o.status = ?');
+    params.push(status);
+  }
+  if (mealType && ['breakfast', 'lunch'].includes(mealType)) {
+    where.push('o.meal_type = ?');
+    params.push(mealType);
+  }
+  if (start_date && /^\d{4}-\d{2}-\d{2}$/.test(String(start_date).trim())) {
+    where.push('DATE(o.created_at) >= ?');
+    params.push(String(start_date).trim());
+  }
+  if (end_date && /^\d{4}-\d{2}-\d{2}$/.test(String(end_date).trim())) {
+    where.push('DATE(o.created_at) <= ?');
+    params.push(String(end_date).trim());
+  }
 
   const whereSql = where.join(' AND ');
 

@@ -50,6 +50,15 @@ Page({
 
   async loadItems() {
     this.setData({ loading: true })
+    let isActive = false
+    try {
+      const actRes = await api.getWishActivities()
+      const act = (actRes.data || []).find(a => a.id === this.data.activityId)
+      isActive = !!(act && act.status === 'active')
+    } catch {
+      isActive = false
+    }
+
     try {
       const res = await api.getWishItems(this.data.activityId)
       const items = (res.data || []).map(item => ({
@@ -57,30 +66,36 @@ Page({
         createdAtStr: formatTime(item.created_at),
         comment_count: item.comment_count || 0,
       }))
-      const isActive = items.length > 0
-        ? true
-        : this.data.isActive
-
-      // 判断活动状态（从第一条数据的activity_status，或复用现有状态）
-      this.setData({ wishItems: items, loading: false })
-
-      // 判断活动是否进行中（从活动列表缓存）
-      try {
-        const actRes = await api.getWishActivities()
-        const act = (actRes.data || []).find(a => a.id === this.data.activityId)
-        if (act) this.setData({ isActive: act.status === 'active' })
-      } catch {}
+      const patch = {
+        wishItems: items,
+        loading: false,
+        isActive,
+      }
+      if (!isActive) {
+        patch.showCommentInput = false
+        patch.showWishSheet = false
+        patch.commentText = ''
+        patch.commentInputFocus = false
+      }
+      this.setData(patch)
     } catch {
-      this.setData({ loading: false })
+      this.setData({ loading: false, isActive })
     }
   },
 
+  toastClosed(msg) {
+    wx.showToast({ title: msg || '活动已结束', icon: 'none' })
+  },
+
   async toggleLike(e) {
+    if (!this.data.isActive) {
+      this.toastClosed('活动已结束，无法点赞')
+      return
+    }
     const { id, index } = e.currentTarget.dataset
     const item = this.data.wishItems[index]
     const wasVoted = item.has_voted
 
-    // 乐观更新
     const updated = [...this.data.wishItems]
     updated[index] = {
       ...item,
@@ -96,7 +111,6 @@ Page({
         await api.voteWishItem(id)
       }
     } catch {
-      // 回滚
       const rollback = [...this.data.wishItems]
       rollback[index] = item
       this.setData({ wishItems: rollback })
@@ -105,15 +119,20 @@ Page({
 
   async toggleComments(e) {
     const { id } = e.currentTarget.dataset
-    const { expandedId } = this.data
+    const { expandedId, isActive } = this.data
 
     if (expandedId === id) {
-      // 收起
       this.setData({ expandedId: null, showCommentInput: false, commentText: '' })
       return
     }
 
-    this.setData({ expandedId: id, comments: [], commentLoading: true, showCommentInput: true, currentCommentItemId: id })
+    this.setData({
+      expandedId: id,
+      comments: [],
+      commentLoading: true,
+      showCommentInput: !!isActive,
+      currentCommentItemId: id,
+    })
     this.loadComments(id)
   },
 
@@ -136,6 +155,10 @@ Page({
   },
 
   async submitComment() {
+    if (!this.data.isActive) {
+      this.toastClosed('活动已结束，无法评论')
+      return
+    }
     const { commentText, currentCommentItemId, expandedId } = this.data
     if (!commentText.trim()) return
 
@@ -144,10 +167,8 @@ Page({
       this.setData({ commentText: '' })
       wx.showToast({ title: '评论成功', icon: 'success', duration: 1200 })
 
-      // 刷新评论列表和评论数
       this.loadComments(expandedId)
 
-      // 更新对应愿望的 comment_count
       const idx = this.data.wishItems.findIndex(w => w.id === expandedId)
       if (idx >= 0) {
         const updated = [...this.data.wishItems]
@@ -177,11 +198,18 @@ Page({
             this.setData({ wishItems: updated })
           }
         } catch {}
-      }
+      },
     })
   },
 
-  showWishSheet() { this.setData({ showWishSheet: true, wishName: '', wishDesc: '' }) },
+  showWishSheet() {
+    if (!this.data.isActive) {
+      this.toastClosed('活动已结束，无法许愿')
+      return
+    }
+    this.setData({ showWishSheet: true, wishName: '', wishDesc: '' })
+  },
+
   hideWishSheet() { this.setData({ showWishSheet: false }) },
 
   onWishInput(e) {

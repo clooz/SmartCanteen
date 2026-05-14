@@ -132,18 +132,56 @@ const getProfile = async (req, res) => {
   }
 };
 
-// 修改个人信息（昵称、头像）
+// 修改个人信息（昵称、头像 URL，可只传其一）
 const updateProfile = async (req, res) => {
-  const { nickname } = req.body;
+  const { nickname, avatar } = req.body;
+
+  const fields = [];
+  const params = [];
+
+  if (nickname !== undefined) {
+    const n = String(nickname).trim();
+    if (!n) return fail(res, '昵称不能为空');
+    if (n.length > 50) return fail(res, '昵称不超过50字');
+    fields.push('nickname = ?');
+    params.push(n);
+  }
+
+  if (avatar !== undefined) {
+    const a = String(avatar || '').trim();
+    if (a.length > 255) return fail(res, '头像地址无效');
+    fields.push('avatar = ?');
+    params.push(a || null);
+  }
+
+  if (fields.length === 0) {
+    return fail(res, '没有要修改的内容');
+  }
 
   try {
-    await pool.query(
-      'UPDATE users SET nickname = ? WHERE id = ?',
-      [nickname, req.user.id]
-    );
+    params.push(req.user.id);
+    await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, params);
     return success(res, null, '更新成功');
   } catch (err) {
     console.error('updateProfile error:', err);
+    return fail(res, '服务器错误', 500);
+  }
+};
+
+// 上传头像（multipart，字段名 avatar）
+const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return fail(res, '请选择图片');
+    }
+    const url = `/uploads/${req.file.filename}`;
+    await pool.query('UPDATE users SET avatar = ? WHERE id = ?', [url, req.user.id]);
+    return success(res, { avatar: url }, '头像已更新');
+  } catch (err) {
+    if (err.message && err.message.includes('仅支持')) {
+      return fail(res, err.message);
+    }
+    console.error('uploadAvatar error:', err);
     return fail(res, '服务器错误', 500);
   }
 };
@@ -187,4 +225,4 @@ const getCompanies = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getProfile, updateProfile, changePassword, getCompanies };
+module.exports = { register, login, getProfile, updateProfile, uploadAvatar, changePassword, getCompanies };

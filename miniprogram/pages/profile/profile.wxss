@@ -11,6 +11,17 @@
   display: flex;
   align-items: center;
 }
+
+.avatar-wrap {
+  position: relative;
+  margin-right: 28rpx;
+  flex-shrink: 0;
+}
+
+.avatar-wrap:active {
+  opacity: 0.88;
+}
+
 .user-avatar {
   width: 100rpx;
   height: 100rpx;
@@ -22,10 +33,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 28rpx;
-  flex-shrink: 0;
   border: 4rpx solid rgba(255,255,255,0.4);
+  overflow: hidden;
 }
+
+.user-avatar--img {
+  display: block;
+  width: 100rpx;
+  height: 100rpx;
+}
+
 .user-info { flex: 1 }
 .user-name { font-size: 40rpx; font-weight: 700; color: #FFFFFF; margin-bottom: 8rpx; }
 .user-meta { display: flex; align-items: center; gap: 8rpx; }

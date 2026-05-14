@@ -5,6 +5,7 @@ const {
   buildOrderingSummary,
   normalizeTimeForDb,
   normalizeOverride,
+  localDateStr,
 } = require('../utils/orderingRules');
 
 // 获取某日菜单（含菜品列表）
@@ -52,10 +53,9 @@ const getMenuByDate = async (req, res) => {
   }
 };
 
-// 获取今日菜单
+// 获取今日菜单（使用服务器本地日历日，与下单逻辑 localDateStr 一致，避免 UTC 跨日错位）
 const getTodayMenu = async (req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
-  req.params.date = today;
+  req.params.date = localDateStr();
   return getMenuByDate(req, res);
 };
 

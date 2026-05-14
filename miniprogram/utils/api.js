@@ -1,7 +1,7 @@
 const { getToken, clearAuth } = require('./storage')
+const { API_BASE } = require('../config/env.js')
 
-// 与 BASE_URL 同源；填本机 ipconfig 的 IPv4（换 WiFi 后常会变）；真机勿用 localhost
-const BASE_URL = 'http://172.16.0.26:3000/api'
+const BASE_URL = String(API_BASE || '').replace(/\/+$/, '')
 const ASSET_ORIGIN = BASE_URL.replace(/\/?api\/?$/i, '').replace(/\/+$/, '') || 'http://127.0.0.1:3000'
 
 /** 把后端返回的相对路径或 localhost 绝对路径转成真机可访问的完整 URL（供 <image> / 预览图） */
@@ -56,7 +56,7 @@ function request(method, path, data = {}) {
   })
 }
 
-function upload(path, filePath, formData = {}) {
+function upload(path, filePath, formData = {}, fileField = 'proof_image') {
   return new Promise((resolve, reject) => {
     const token = getToken()
     const header = {}
@@ -72,8 +72,7 @@ function upload(path, filePath, formData = {}) {
     wx.uploadFile({
       url: `${BASE_URL}${path}`,
       filePath,
-      // 须与 server/src/routes/recharge.js 中 upload.single('proof_image') 一致
-      name: 'proof_image',
+      name: fileField,
       formData: stringForm,
       header,
       success(res) {
@@ -119,7 +118,7 @@ const api = {
   post:   (path, data)       => request('POST',   path, data),
   put:    (path, data)       => request('PUT',    path, data),
   delete: (path, data)       => request('DELETE', path, data),
-  upload: (path, file, form) => upload(path, file, form),
+  upload: (path, file, form, fileField) => upload(path, file, form || {}, fileField),
 
   // ── Auth ──
   getCompanies:   ()     => api.get('/auth/companies'),
@@ -132,8 +131,14 @@ const api = {
   // ── Menu ──
   getTodayMenu: (data) => api.get('/menus/today', data),
 
+  // ── Orders（员工）──
+  createOrder: (data) => api.post('/orders', data),
+  getMyOrders: (params) => api.get('/orders/my', params),
+  getOrderById: (id) => api.get(`/orders/${id}`),
+  cancelOrder: (id) => api.put(`/orders/${id}/status`, { status: 'cancelled' }),
+
   // ── Wish ──
-  getWishActivities:    ()         => api.get('/wish/activities'),
+  getWishActivities:    (params)   => api.get('/wish/activities', params || {}),
   getWishItems:         (actId)    => api.get(`/wish/activities/${actId}/items`),
   createWishItem:       (actId, d) => api.post(`/wish/activities/${actId}/items`, d),
   voteWishItem:         (itemId)   => api.post(`/wish/items/${itemId}/vote`),
@@ -144,6 +149,7 @@ const api = {
 
   // ── Recharge ──
   submitRecharge:    (filePath, form) => api.upload('/recharge', filePath, form),
+  uploadAvatar:      (filePath)       => api.upload('/auth/profile/avatar', filePath, {}, 'avatar'),
   getMyRecharges:    (params)         => api.get('/recharge/my', params),
 
   ASSET_ORIGIN,

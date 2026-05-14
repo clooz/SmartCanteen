@@ -5,6 +5,7 @@ Page({
   data: {
     userInfo: {},
     avatarText: '?',
+    avatarUrl: '',
     showNicknameSheet: false,
     newNickname: '',
     showPasswordSheet: false,
@@ -27,12 +28,62 @@ Page({
       setUserInfo(userInfo)
       getApp().globalData.userInfo = userInfo
       const name = userInfo.nickname || userInfo.username || '?'
-      this.setData({ userInfo, avatarText: name.slice(-2) })
+      const avatarUrl = userInfo.avatar ? api.resolveAssetUrl(userInfo.avatar) : ''
+      this.setData({
+        userInfo,
+        avatarText: name.slice(-2),
+        avatarUrl,
+      })
     } catch {}
+  },
+
+  /** 头像区域：直接选图上传 */
+  async onChooseAvatar() {
+    try {
+      let tempPath = ''
+      try {
+        const r = await wx.chooseMedia({
+          count: 1,
+          mediaType: ['image'],
+          sizeType: ['compressed'],
+          sourceType: ['album', 'camera'],
+        })
+        tempPath = r.tempFiles[0].tempFilePath
+      } catch {
+        const r2 = await wx.chooseImage({
+          count: 1,
+          sizeType: ['compressed'],
+          sourceType: ['album', 'camera'],
+        })
+        tempPath = r2.tempFilePaths[0]
+      }
+      wx.showLoading({ title: '上传中', mask: true })
+      await api.uploadAvatar(tempPath)
+      wx.hideLoading()
+      wx.showToast({ title: '头像已更新', icon: 'success' })
+      this.loadProfile()
+    } catch {
+      wx.hideLoading()
+    }
+  },
+
+  /** 右侧入口：与头像点击互补，选昵称或头像 */
+  onEditProfileTap() {
+    wx.showActionSheet({
+      itemList: ['修改昵称', '更换头像'],
+      success: ({ tapIndex }) => {
+        if (tapIndex === 0) this.goEditNickname()
+        else if (tapIndex === 1) this.onChooseAvatar()
+      },
+    })
   },
 
   goRechargeRecords() {
     wx.navigateTo({ url: '/pages/recharge-records/recharge-records' })
+  },
+
+  goMyOrders() {
+    wx.navigateTo({ url: '/pages/my-orders/my-orders' })
   },
 
   goEditNickname() {

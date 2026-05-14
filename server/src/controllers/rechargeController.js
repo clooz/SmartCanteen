@@ -27,22 +27,44 @@ const createRecharge = async (req, res) => {
 
 // 用户查看自己的充值记录
 const getMyRecharges = async (req, res) => {
-  const { page = 1, page_size = 10 } = req.query;
+  const {
+    page = 1,
+    page_size = 10,
+    status,
+    start_date,
+    end_date,
+  } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(page_size);
+
+  const where = ['r.user_id = ?'];
+  const params = [req.user.id];
+  if (status && ['pending', 'completed', 'rejected'].includes(status)) {
+    where.push('r.status = ?');
+    params.push(status);
+  }
+  if (start_date && /^\d{4}-\d{2}-\d{2}$/.test(String(start_date).trim())) {
+    where.push('DATE(r.created_at) >= ?');
+    params.push(String(start_date).trim());
+  }
+  if (end_date && /^\d{4}-\d{2}-\d{2}$/.test(String(end_date).trim())) {
+    where.push('DATE(r.created_at) <= ?');
+    params.push(String(end_date).trim());
+  }
+  const whereSql = where.join(' AND ');
 
   try {
     const [[{ total }]] = await pool.query(
-      'SELECT COUNT(*) AS total FROM recharge_records WHERE user_id = ?',
-      [req.user.id]
+      `SELECT COUNT(*) AS total FROM recharge_records r WHERE ${whereSql}`,
+      params
     );
     const [rows] = await pool.query(
       `SELECT r.*, u.nickname AS reviewer_name
        FROM recharge_records r
        LEFT JOIN users u ON r.reviewed_by = u.id
-       WHERE r.user_id = ?
+       WHERE ${whereSql}
        ORDER BY r.created_at DESC
        LIMIT ? OFFSET ?`,
-      [req.user.id, parseInt(page_size), offset]
+      [...params, parseInt(page_size), offset]
     );
     return success(res, { total, page: parseInt(page), page_size: parseInt(page_size), list: rows });
   } catch (err) {

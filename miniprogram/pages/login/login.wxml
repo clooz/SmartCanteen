@@ -81,7 +81,7 @@
       <view class="picker-title">选择公司</view>
       <view class="picker-confirm" bindtap="confirmCompany">确认</view>
     </view>
-    <scroll-view scroll-y class="picker-list">
+    <scroll-view scroll-y class="picker-list" enhanced show-scrollbar="{{false}}">
       <view
         wx:for="{{companies}}"
         wx:key="id"

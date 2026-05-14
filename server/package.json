@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "prestart": "node ../scripts/sync-miniprogram-dev-ip.js",
+    "predev": "node ../scripts/sync-miniprogram-dev-ip.js",
+    "sync:mp-ip": "node ../scripts/sync-miniprogram-dev-ip.js",
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "seed": "node src/db/seed.js"

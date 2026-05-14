@@ -1,6 +1,6 @@
 <view class="page">
   <!-- 愿望列表 -->
-  <scroll-view scroll-y class="wish-scroll" enable-passive>
+  <scroll-view scroll-y class="wish-scroll" enhanced show-scrollbar="{{false}}" enable-passive>
     <!-- 标题区 -->
     <view class="activity-banner">
       <view class="activity-title">{{activityTitle}}</view>
@@ -8,6 +8,7 @@
         {{isActive ? '活动进行中' : '活动已结束'}}
       </view>
     </view>
+    <view wx:if="{{!isActive}}" class="closed-tip">本活动已结束，可浏览愿望与评论，不可许愿、点赞或发评论。</view>
 
     <!-- 加载中 -->
     <view wx:if="{{loading}}" class="loading-wrap">
@@ -19,6 +20,7 @@
       <view class="empty-icon">💭</view>
       <view class="empty-title">还没有愿望</view>
       <view wx:if="{{isActive}}" class="empty-sub">成为第一个许愿的人吧～</view>
+      <view wx:else class="empty-sub">活动已结束，暂无愿望记录</view>
     </view>
 
     <!-- 愿望列表 -->
@@ -54,7 +56,7 @@
         <view class="wish-actions">
           <!-- 点赞按钮 -->
           <view
-            class="action-btn like-btn {{item.has_voted ? 'liked' : ''}}"
+            class="action-btn like-btn {{item.has_voted ? 'liked' : ''}} {{isActive ? '' : 'is-disabled'}}"
             bindtap="toggleLike"
             data-id="{{item.id}}"
             data-index="{{index}}"
@@ -79,7 +81,9 @@
         <view wx:if="{{expandedId === item.id}}" class="comment-section">
           <van-loading wx:if="{{commentLoading}}" type="spinner" color="#DC2626" size="36rpx" style="display:block;padding:24rpx 0;text-align:center;" />
 
-          <view wx:elif="{{comments.length === 0}}" class="no-comments">暂无评论，快来说说你的想法</view>
+          <view wx:elif="{{comments.length === 0}}" class="no-comments">
+            {{isActive ? '暂无评论，快来说说你的想法' : '暂无评论'}}
+          </view>
 
           <view wx:else class="comment-list">
             <view wx:for="{{comments}}" wx:for-item="c" wx:key="id" class="comment-item">
@@ -112,7 +116,7 @@
     </view>
 
     <!-- 评论输入框（点击评论按钮后显示） -->
-    <view wx:if="{{showCommentInput}}" class="comment-input-bar">
+    <view wx:if="{{showCommentInput && isActive}}" class="comment-input-bar">
       <input
         class="comment-input"
         placeholder="说说你的想法..."

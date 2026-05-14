@@ -1,0 +1,130 @@
+<view class="page">
+  <view class="toolbar">
+    <view class="link-orders" bindtap="goOrders">我的订单</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-wrap">
+    <van-loading type="spinner" color="#0891B2" size="48rpx" />
+    <text class="loading-text">加载菜单中…</text>
+  </view>
+
+  <view wx:elif="{{!breakfastDishes.length && !lunchDishes.length}}" class="empty-area">
+    <view class="empty-title">今日菜单暂未发布</view>
+    <view class="empty-sub">请稍后再试，或返回首页刷新</view>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{ordering}}" class="ordering-card">
+      <view class="ordering-card-title">订餐时段</view>
+      <view class="ordering-grid">
+        <view class="ordering-cell">
+          <view class="ordering-cell-top">
+            <text class="ordering-meal">早餐</text>
+            <view wx:if="{{ordering.breakfast.accepting}}" class="ordering-pill ordering-pill--ok">可订</view>
+            <view wx:elif="{{ordering.breakfast.reasonCode === 'ended'}}" class="ordering-pill ordering-pill--muted">已截止</view>
+            <view wx:elif="{{ordering.breakfast.reasonCode === 'not_started'}}" class="ordering-pill ordering-pill--wait">未开始</view>
+            <view wx:else class="ordering-pill ordering-pill--bad">不可订</view>
+          </view>
+          <text wx:if="{{ordering.breakfast.window}}" class="ordering-time">{{ordering.breakfast.window}}</text>
+          <text
+            wx:if="{{ordering.breakfast.message && ordering.breakfast.reasonCode !== 'ended'}}"
+            class="ordering-hint"
+          >{{ordering.breakfast.message}}</text>
+        </view>
+        <view class="ordering-vr" />
+        <view class="ordering-cell">
+          <view class="ordering-cell-top">
+            <text class="ordering-meal">午餐</text>
+            <view wx:if="{{ordering.lunch.accepting}}" class="ordering-pill ordering-pill--ok">可订</view>
+            <view wx:elif="{{ordering.lunch.reasonCode === 'ended'}}" class="ordering-pill ordering-pill--muted">已截止</view>
+            <view wx:elif="{{ordering.lunch.reasonCode === 'not_started'}}" class="ordering-pill ordering-pill--wait">未开始</view>
+            <view wx:else class="ordering-pill ordering-pill--bad">不可订</view>
+          </view>
+          <text wx:if="{{ordering.lunch.window}}" class="ordering-time">{{ordering.lunch.window}}</text>
+          <text
+            wx:if="{{ordering.lunch.message && ordering.lunch.reasonCode !== 'ended'}}"
+            class="ordering-hint"
+          >{{ordering.lunch.message}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="meal-tabs" wx:if="{{breakfastDishes.length && lunchDishes.length}}">
+      <view class="tab {{mealType === 'breakfast' ? 'active' : ''}}" data-type="breakfast" bindtap="switchMeal">
+        <text class="tab-name">早餐</text>
+        <text wx:if="{{breakfastTabTag}}" class="tab-tag tab-tag--{{breakfastTabTone}}">{{breakfastTabTag}}</text>
+      </view>
+      <view class="tab {{mealType === 'lunch' ? 'active' : ''}}" data-type="lunch" bindtap="switchMeal">
+        <text class="tab-name">午餐</text>
+        <text wx:if="{{lunchTabTag}}" class="tab-tag tab-tag--{{lunchTabTone}}">{{lunchTabTag}}</text>
+      </view>
+    </view>
+    <view wx:elif="{{breakfastDishes.length}}" class="meal-single-row">
+      <text class="meal-single">早餐</text>
+      <text wx:if="{{breakfastTabTag}}" class="meal-single-tag tab-tag tab-tag--{{breakfastTabTone}}">{{breakfastTabTag}}</text>
+    </view>
+    <view wx:elif="{{lunchDishes.length}}" class="meal-single-row">
+      <text class="meal-single">午餐</text>
+      <text wx:if="{{lunchTabTag}}" class="meal-single-tag tab-tag tab-tag--{{lunchTabTone}}">{{lunchTabTag}}</text>
+    </view>
+
+    <scroll-view scroll-y class="dish-scroll" enhanced show-scrollbar="{{false}}" enable-passive>
+      <block wx:if="{{orderMealBlocked}}">
+        <view class="order-blocked">
+          <view class="order-blocked-title">{{orderBlockedTitle}}</view>
+          <view wx:if="{{orderBlockedSub}}" class="order-blocked-sub">{{orderBlockedSub}}</view>
+        </view>
+      </block>
+      <block wx:else>
+        <view
+          wx:for="{{mealType === 'breakfast' ? breakfastDishes : lunchDishes}}"
+          wx:key="id"
+          class="dish-row"
+        >
+          <image wx:if="{{item.image_url}}" class="dish-thumb" src="{{item.image_url}}" mode="aspectFill" />
+          <view wx:else class="dish-thumb ph">🍽</view>
+          <view class="dish-main">
+            <view class="dish-name">{{item.name}}</view>
+            <view class="dish-meta">
+              <text class="price">¥{{item.price}}</text>
+              <text wx:if="{{item.stock != null}}" class="stock">剩 {{item.stock}}</text>
+              <text wx:else class="stock">不限量</text>
+            </view>
+          </view>
+          <view class="qty-box">
+            <view class="qty-btn" data-id="{{item.id}}" bindtap="decQty">−</view>
+            <text class="qty-num">{{quantities[item.id] || 0}}</text>
+            <view class="qty-btn" data-id="{{item.id}}" bindtap="incQty">+</view>
+          </view>
+        </view>
+        <view class="remark-block">
+          <view class="remark-label">备注（选填）</view>
+          <textarea
+            class="remark-input"
+            placeholder="口味、忌口等"
+            value="{{remark}}"
+            maxlength="120"
+            bindinput="onRemark"
+          />
+        </view>
+      </block>
+      <view class="scroll-pad"></view>
+    </scroll-view>
+
+    <view class="footer">
+      <view class="footer-sum">
+        <text class="sum-label">合计</text>
+        <text class="sum-price">¥{{totalText}}</text>
+        <text class="sum-count" wx:if="{{totalCount}}">共 {{totalCount}} 份</text>
+      </view>
+      <button
+        class="btn-submit {{canSubmit ? '' : 'disabled'}}"
+        disabled="{{submitting || !canSubmit}}"
+        bindtap="submit"
+      >
+        <van-loading wx:if="{{submitting}}" size="32rpx" color="#fff" />
+        <text wx:else>提交订单</text>
+      </button>
+    </view>
+  </block>
+</view>

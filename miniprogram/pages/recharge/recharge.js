@@ -3,6 +3,7 @@ const { getToken } = require('../../utils/storage')
 
 Page({
   data: {
+    statusBarHeight: 20,
     amount: '',
     proofImage: '',
     remark: '',
@@ -12,6 +13,15 @@ Page({
 
   onLoad() {
     if (!getToken()) { wx.reLaunch({ url: '/pages/login/login' }); return }
+    const sys = wx.getSystemInfoSync()
+    let statusBarHeight = sys.statusBarHeight || 20
+    try {
+      const menu = wx.getMenuButtonBoundingClientRect()
+      if (menu && menu.top > 0) {
+        statusBarHeight = menu.top
+      }
+    } catch (_) {}
+    this.setData({ statusBarHeight })
   },
 
   onAmountInput(e) { this.setData({ amount: e.detail.value }) },

@@ -1,7 +1,10 @@
 <view class="page">
   <!-- 用户信息卡片 -->
   <view class="user-card">
-    <view class="user-avatar">{{avatarText}}</view>
+    <view class="avatar-wrap" bindtap="onChooseAvatar">
+      <image wx:if="{{avatarUrl}}" class="user-avatar user-avatar--img" src="{{avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="user-avatar">{{avatarText}}</view>
+    </view>
     <view class="user-info">
       <view class="user-name">{{userInfo.nickname || userInfo.username || '用户'}}</view>
       <view class="user-meta">
@@ -10,8 +13,8 @@
         <text class="user-role">员工</text>
       </view>
     </view>
-    <view class="user-edit" bindtap="goEditNickname">
-      <van-icon name="edit" size="40rpx" color="rgba(255,255,255,0.8)" />
+    <view class="user-edit" bindtap="onEditProfileTap">
+      <van-icon name="edit" size="40rpx" color="rgba(255,255,255,0.85)" />
     </view>
   </view>
 
@@ -25,11 +28,10 @@
         <view class="menu-arrow">›</view>
       </view>
       <view class="menu-divider"></view>
-      <!-- 订餐 - 即将开放 -->
-      <view class="menu-item disabled">
+      <view class="menu-item" bindtap="goMyOrders">
         <view class="menu-icon order">🍱</view>
         <view class="menu-label">我的订单</view>
-        <view class="menu-badge">即将开放</view>
+        <view class="menu-arrow">›</view>
       </view>
     </view>
   </view>
@@ -37,12 +39,6 @@
   <view class="menu-group">
     <view class="group-title">账号设置</view>
     <view class="menu-card">
-      <view class="menu-item" bindtap="goEditNickname">
-        <view class="menu-icon nickname">✏️</view>
-        <view class="menu-label">修改昵称</view>
-        <view class="menu-arrow">›</view>
-      </view>
-      <view class="menu-divider"></view>
       <view class="menu-item" bindtap="goChangePassword">
         <view class="menu-icon password">🔒</view>
         <view class="menu-label">修改密码</view>
@@ -70,7 +66,7 @@
         placeholder="请输入新昵称"
         value="{{newNickname}}"
         bindinput="onNicknameInput"
-        maxlength="20"
+        maxlength="50"
         focus="{{showNicknameSheet}}"
       />
     </view>

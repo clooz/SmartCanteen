@@ -1,5 +1,9 @@
 {
   "navigationBarTitleText": "今日菜单",
+  "navigationBarBackgroundColor": "#E8FAFC",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#E8FAFC",
+  "backgroundTextStyle": "dark",
   "enablePullDownRefresh": true,
   "usingComponents": {
     "van-icon": "@vant/weapp/icon/index",

@@ -1,86 +1,95 @@
 <view class="page">
-  <view class="header">
-    <view class="header-title">申请充值</view>
-    <view class="header-sub">上传转账凭证，管理员审核后到账</view>
-  </view>
-
-  <view class="form-wrap">
-    <!-- 金额输入 -->
-    <view class="form-section">
-      <view class="section-label">充值金额</view>
-      <view class="amount-input-wrap">
-        <text class="currency-symbol">¥</text>
-        <input
-          class="amount-input"
-          type="digit"
-          placeholder="请输入充值金额"
-          value="{{amount}}"
-          bindinput="onAmountInput"
-          placeholder-class="amount-placeholder"
-        />
-      </view>
-      <!-- 快捷金额 -->
-      <view class="quick-amounts">
-        <view
-          wx:for="{{quickAmounts}}"
-          wx:key="*this"
-          class="quick-btn {{amount === item ? 'active' : ''}}"
-          bindtap="setQuickAmount"
-          data-val="{{item}}"
-        >{{item}}</view>
+  <!-- 自定义顶区：安全区 + 标题 + 副标题（与许愿列表 hero 一致） -->
+  <view class="hero" style="padding-top: {{statusBarHeight}}px;">
+    <view class="hero-inner">
+      <view class="hero-head">
+        <text class="hero-title">申请充值</text>
+        <text class="hero-sub">上传转账凭证，管理员审核后到账</text>
       </view>
     </view>
+  </view>
 
-    <!-- 上传凭证 -->
-    <view class="form-section">
-      <view class="section-label">转账凭证 <text class="required">*</text></view>
-      <view class="section-hint">请上传支付宝/微信转账截图</view>
+  <view class="body">
+    <scroll-view scroll-y class="form-scroll" enhanced show-scrollbar="{{false}}" enable-passive>
+      <view class="form-wrap">
+        <!-- 金额输入 -->
+        <view class="form-section">
+          <view class="section-label">充值金额</view>
+          <view class="amount-input-wrap">
+            <text class="currency-symbol">¥</text>
+            <input
+              class="amount-input"
+              type="digit"
+              placeholder="请输入充值金额"
+              value="{{amount}}"
+              bindinput="onAmountInput"
+              placeholder-class="amount-placeholder"
+            />
+          </view>
+          <!-- 快捷金额 -->
+          <view class="quick-amounts">
+            <view
+              wx:for="{{quickAmounts}}"
+              wx:key="*this"
+              class="quick-btn {{amount === item ? 'active' : ''}}"
+              bindtap="setQuickAmount"
+              data-val="{{item}}"
+            >{{item}}</view>
+          </view>
+        </view>
 
-      <view wx:if="{{!proofImage}}" class="upload-area" bindtap="chooseImage">
-        <view class="upload-icon">📎</view>
-        <view class="upload-text">点击上传凭证</view>
-        <view class="upload-sub">支持拍照或从相册选择</view>
-      </view>
+        <!-- 上传凭证 -->
+        <view class="form-section">
+          <view class="section-label">转账凭证 <text class="required">*</text></view>
+          <view class="section-hint">请上传支付宝/微信转账截图</view>
 
-      <view wx:else class="image-preview-wrap">
-        <image class="proof-image" src="{{proofImage}}" mode="aspectFit" bindtap="previewImage" />
-        <view class="image-del" bindtap="removeImage">
-          <van-icon name="close" size="28rpx" color="#fff" />
+          <view wx:if="{{!proofImage}}" class="upload-area" bindtap="chooseImage">
+            <view class="upload-icon">📎</view>
+            <view class="upload-text">点击上传凭证</view>
+            <view class="upload-sub">支持拍照或从相册选择</view>
+          </view>
+
+          <view wx:else class="image-preview-wrap">
+            <image class="proof-image" src="{{proofImage}}" mode="aspectFit" bindtap="previewImage" />
+            <view class="image-del" bindtap="removeImage">
+              <van-icon name="close" size="28rpx" color="#fff" />
+            </view>
+          </view>
+        </view>
+
+        <!-- 备注 -->
+        <view class="form-section">
+          <view class="section-label">备注（选填）</view>
+          <textarea
+            class="remark-input"
+            placeholder="可补充说明，如转账时间等"
+            value="{{remark}}"
+            bindinput="onRemarkInput"
+            maxlength="100"
+            placeholder-class="remark-placeholder"
+          />
+        </view>
+
+        <!-- 说明 -->
+        <view class="notice-card">
+          <view class="notice-title">📋 充值说明</view>
+          <view class="notice-item">• 请先完成转账，再上传凭证申请</view>
+          <view class="notice-item">• 管理员审核通过后将更新充值状态</view>
+          <view class="notice-item">• 审核结果可在「我的 → 充值记录」查看</view>
         </view>
       </view>
-    </view>
+    </scroll-view>
 
-    <!-- 备注 -->
-    <view class="form-section">
-      <view class="section-label">备注（选填）</view>
-      <textarea
-        class="remark-input"
-        placeholder="可补充说明，如转账时间等"
-        value="{{remark}}"
-        bindinput="onRemarkInput"
-        maxlength="100"
-        placeholder-class="remark-placeholder"
-      />
+    <!-- 提交按钮 -->
+    <view class="submit-wrap">
+      <button
+        class="btn-submit {{(!proofImage || !amount || loading) ? 'disabled' : ''}}"
+        bindtap="onSubmit"
+        disabled="{{!proofImage || !amount || loading}}"
+      >
+        <van-loading wx:if="{{loading}}" size="36rpx" color="#fff" />
+        <text wx:else>提交充值申请</text>
+      </button>
     </view>
-
-    <!-- 说明 -->
-    <view class="notice-card">
-      <view class="notice-title">📋 充值说明</view>
-      <view class="notice-item">• 请先完成转账，再上传凭证申请</view>
-      <view class="notice-item">• 管理员审核通过后将更新充值状态</view>
-      <view class="notice-item">• 审核结果可在「我的 → 充值记录」查看</view>
-    </view>
-  </view>
-
-  <!-- 提交按钮 -->
-  <view class="submit-wrap">
-    <button
-      class="btn-submit {{(!proofImage || !amount || loading) ? 'disabled' : ''}}"
-      bindtap="onSubmit"
-      disabled="{{!proofImage || !amount || loading}}"
-    >
-      <van-loading wx:if="{{loading}}" size="36rpx" color="#fff" />
-      <text wx:else>提交充值申请</text>
-    </button>
   </view>
 </view>

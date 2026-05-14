@@ -1,46 +1,78 @@
 <view class="page">
-  <!-- 顶部日期栏 -->
-  <view class="header">
-    <view class="header-left">
-      <view class="header-date">{{todayStr}}</view>
-      <view class="header-title">今日菜单</view>
+  <view class="page-atmos">
+    <view class="page-atmos-blob page-atmos-blob--a" />
+    <view class="page-atmos-blob page-atmos-blob--b" />
+  </view>
+
+  <view wx:if="{{hasMenu}}" class="menu-top-area">
+    <view class="menu-hero">
+      <view class="menu-hero-main">
+        <text class="menu-hero-date-line">{{menuDateLine}}</text>
+        <text class="menu-hero-sub">共 {{totalDishCount}} 道菜 · 下拉可刷新</text>
+      </view>
+      <view class="menu-hero-stat">
+        <text class="menu-hero-stat-num">{{totalDishCount}}</text>
+        <text class="menu-hero-stat-unit">道菜</text>
+      </view>
     </view>
-    <view class="header-refresh {{refreshing ? 'is-refreshing' : ''}}" bindtap="onRefresh">
-      <van-loading wx:if="{{refreshing}}" type="spinner" size="36rpx" color="#fff" />
-      <van-icon wx:else name="replay" size="40rpx" color="#fff" />
+
+    <view class="order-cta" bindtap="goOrder">
+      <view class="order-cta-glow" />
+      <view class="order-cta-inner">
+        <view class="order-cta-left">
+          <view class="order-cta-icon-wrap">
+            <van-icon name="shopping-cart-o" size="40rpx" color="#FFFFFF" />
+          </view>
+          <view class="order-cta-texts">
+            <text class="order-cta-title">去下单</text>
+            <text class="order-cta-sub">选餐、结算，一步完成</text>
+          </view>
+        </view>
+        <text class="order-cta-arrow">›</text>
+      </view>
     </view>
   </view>
 
-  <!-- 加载中 -->
   <view wx:if="{{loading}}" class="loading-wrap">
-    <van-loading type="spinner" color="#DC2626" size="48rpx" />
-    <text style="margin-left:16rpx;color:#DC2626;font-size:26rpx;">加载中...</text>
+    <view class="loading-card">
+      <van-loading type="spinner" color="#0891B2" size="44rpx" />
+      <text class="loading-text">加载菜品中…</text>
+    </view>
   </view>
 
-  <!-- 无菜单 -->
   <view wx:elif="{{!hasMenu}}" class="empty-area">
-    <view class="empty-bowl">🍜</view>
-    <view class="empty-title">今日菜单暂未发布</view>
-    <view class="empty-sub">食堂小哥正在努力配菜，请稍后查看～</view>
+    <view class="empty-orbit">
+      <view class="empty-orbit-ring" />
+      <view class="empty-bowl">🍜</view>
+    </view>
+    <view class="empty-title">今日菜谱待发布</view>
+    <view class="empty-date">{{menuDateLine}}</view>
+    <view class="empty-sub">食堂正在配菜中，下拉或点按钮刷新试试</view>
     <view class="empty-btn" bindtap="onRefresh">刷新试试</view>
+    <view class="empty-actions">
+      <view class="empty-link" bindtap="goWish">去许愿</view>
+      <text class="empty-actions-dot">·</text>
+      <view class="empty-link" bindtap="goProfile">我的</view>
+    </view>
   </view>
 
-  <!-- 菜单内容 -->
-  <scroll-view wx:elif="{{hasMenu}}" scroll-y class="menu-scroll" enable-passive>
-    <!-- 早餐区 -->
-    <view wx:if="{{breakfastDishes.length > 0}}" class="meal-section">
+  <scroll-view wx:elif="{{hasMenu}}" scroll-y class="menu-scroll" enhanced show-scrollbar="{{false}}" enable-passive>
+    <view wx:if="{{breakfastDishes.length > 0}}" class="meal-block meal-block--bf">
       <van-sticky offset-top="0">
-        <view class="section-header breakfast">
-          <view class="section-icon">☀️</view>
-          <view class="section-title">早  餐</view>
-          <view class="section-count">{{breakfastDishes.length}} 道</view>
+        <view class="section-cap section-cap--bf">
+          <view class="section-cap-icon">☀️</view>
+          <view class="section-cap-mid">
+            <text class="section-cap-kicker">晨间</text>
+            <text class="section-cap-title">早餐</text>
+          </view>
+          <view class="section-cap-badge">{{breakfastDishes.length}} 道</view>
         </view>
       </van-sticky>
-      <view class="dish-grid">
+      <view class="dish-stack">
         <view
           wx:for="{{breakfastDishes}}"
           wx:key="id"
-          class="dish-card"
+          class="dish-card dish-card--bf"
         >
           <view class="dish-img-wrap">
             <image
@@ -55,31 +87,35 @@
             </view>
           </view>
           <view class="dish-info">
-            <view class="dish-name">{{item.name}}</view>
+            <view class="dish-head">
+              <text class="dish-name">{{item.name}}</text>
+              <text class="dish-price dish-price--bf">¥{{item.price}}</text>
+            </view>
             <view wx:if="{{item.description}}" class="dish-desc">{{item.description}}</view>
             <view class="dish-footer">
               <view class="dish-category">{{item.category || '其他'}}</view>
-              <view class="dish-price">¥{{item.price}}</view>
             </view>
           </view>
         </view>
       </view>
     </view>
 
-    <!-- 午餐区 -->
-    <view wx:if="{{lunchDishes.length > 0}}" class="meal-section">
+    <view wx:if="{{lunchDishes.length > 0}}" class="meal-block meal-block--lunch">
       <van-sticky offset-top="0">
-        <view class="section-header lunch">
-          <view class="section-icon">🌤</view>
-          <view class="section-title">午  饭</view>
-          <view class="section-count">{{lunchDishes.length}} 道</view>
+        <view class="section-cap section-cap--lunch">
+          <view class="section-cap-icon">🌤</view>
+          <view class="section-cap-mid">
+            <text class="section-cap-kicker">午间</text>
+            <text class="section-cap-title">午餐</text>
+          </view>
+          <view class="section-cap-badge">{{lunchDishes.length}} 道</view>
         </view>
       </van-sticky>
-      <view class="dish-grid">
+      <view class="dish-stack">
         <view
           wx:for="{{lunchDishes}}"
           wx:key="id"
-          class="dish-card"
+          class="dish-card dish-card--lunch"
         >
           <view class="dish-img-wrap">
             <image
@@ -94,17 +130,23 @@
             </view>
           </view>
           <view class="dish-info">
-            <view class="dish-name">{{item.name}}</view>
+            <view class="dish-head">
+              <text class="dish-name">{{item.name}}</text>
+              <text class="dish-price dish-price--lunch">¥{{item.price}}</text>
+            </view>
             <view wx:if="{{item.description}}" class="dish-desc">{{item.description}}</view>
             <view class="dish-footer">
               <view class="dish-category">{{item.category || '其他'}}</view>
-              <view class="dish-price">¥{{item.price}}</view>
             </view>
           </view>
         </view>
       </view>
     </view>
 
-    <view class="list-end">今日菜品已全部展示</view>
+    <view class="list-end">
+      <view class="list-end-dot" />
+      <text class="list-end-text">今日菜品已全部展示</text>
+      <view class="list-end-dot" />
+    </view>
   </scroll-view>
 </view>

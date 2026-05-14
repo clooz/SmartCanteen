@@ -1,22 +1,37 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
 import { flushSync } from 'react-dom'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { ConfigProvider, App as AntApp, theme } from 'antd'
+import { ConfigProvider, App as AntApp, theme, Spin } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { authStore } from './store/authStore'
 import PrivateRoute from './components/PrivateRoute'
 import AppLayout from './components/AppLayout'
 import LoginPage from './pages/login/LoginPage'
-import KitchenPage from './pages/kitchen/KitchenPage'
-import DishesPage from './pages/dishes/DishesPage'
-import MenusPage from './pages/menus/MenusPage'
-import OrdersPage from './pages/orders/OrdersPage'
-import ReportPage from './pages/report/ReportPage'
-import UsersPage from './pages/users/UsersPage'
-import CompaniesPage from './pages/companies/CompaniesPage'
-import RechargePage from './pages/recharge/RechargePage'
-import WishPage from './pages/wish/WishPage'
 import './styles/global.css'
+
+const KitchenPage = lazy(() => import('./pages/kitchen/KitchenPage'))
+const DishesPage = lazy(() => import('./pages/dishes/DishesPage'))
+const MenusPage = lazy(() => import('./pages/menus/MenusPage'))
+const OrdersPage = lazy(() => import('./pages/orders/OrdersPage'))
+const ReportPage = lazy(() => import('./pages/report/ReportPage'))
+const UsersPage = lazy(() => import('./pages/users/UsersPage'))
+const CompaniesPage = lazy(() => import('./pages/companies/CompaniesPage'))
+const RechargePage = lazy(() => import('./pages/recharge/RechargePage'))
+const WishPage = lazy(() => import('./pages/wish/WishPage'))
+
+function RouteFallback() {
+  return (
+    <div style={{
+      minHeight: 240,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}
+    >
+      <Spin size="large" tip="加载中…" />
+    </div>
+  )
+}
 
 export type ThemeMode = 'light' | 'dark'
 
@@ -178,7 +193,8 @@ export default function App() {
     >
       <AntApp>
         <BrowserRouter>
-          <Routes>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={
               <PrivateRoute
@@ -201,7 +217,8 @@ export default function App() {
               <Route path="companies" element={<PrivateRoute roles={['admin']}><CompaniesPage /></PrivateRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </AntApp>
     </ConfigProvider>

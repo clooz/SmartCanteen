@@ -50,6 +50,9 @@ page {
   line-height: 1.6;
 }
 
+/* 列表滚动条：业务页内纵向滚动统一用 scroll-view 的 enhanced + show-scrollbar=false
+  （微信文档要求二者同开，垂直滚动条才可隐藏；不影响触摸滑动与惯性滚动）。 */
+
 /* ===== 工具类 ===== */
 .flex            { display: flex; }
 .flex-col        { display: flex; flex-direction: column; }

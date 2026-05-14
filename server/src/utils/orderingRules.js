@@ -172,12 +172,14 @@ function buildOrderingSummary(menu, settings, now = new Date()) {
   return {
     breakfast: {
       accepting: bf.accepting,
+      reasonCode: bf.reasonCode,
       override: bf.override,
       window: formatWindowLabel(bf.windowStart, bf.windowEnd),
       message: bf.accepting ? '' : bf.reasonText,
     },
     lunch: {
       accepting: lu.accepting,
+      reasonCode: lu.reasonCode,
       override: lu.override,
       window: formatWindowLabel(lu.windowStart, lu.windowEnd),
       message: lu.accepting ? '' : lu.reasonText,

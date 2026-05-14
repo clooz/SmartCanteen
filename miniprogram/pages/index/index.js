@@ -3,18 +3,29 @@ const { getToken } = require('../../utils/storage')
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
+function formatZhMenuDate(input) {
+  let d
+  if (!input) {
+    d = new Date()
+  } else if (input instanceof Date) {
+    d = input
+  } else {
+    const s = String(input).slice(0, 10)
+    d = new Date(s.replace(/-/g, '/'))
+  }
+  if (Number.isNaN(d.getTime())) return ''
+  const weeks = ['日', '一', '二', '三', '四', '五', '六']
+  return `${d.getMonth() + 1}月${d.getDate()}日 · 星期${weeks[d.getDay()]}`
+}
+
 Page({
   data: {
     loading: false,
-    refreshing: false,
     hasMenu: false,
     breakfastDishes: [],
     lunchDishes: [],
-    todayStr: '',
-  },
-
-  onLoad() {
-    this.setTodayStr()
+    menuDateLine: formatZhMenuDate(),
+    totalDishCount: 0,
   },
 
   onShow() {
@@ -32,13 +43,6 @@ Page({
 
   onPullDownRefresh() {
     this.loadMenu().finally(() => wx.stopPullDownRefresh())
-  },
-
-  setTodayStr() {
-    const d = new Date()
-    const week = ['日', '一', '二', '三', '四', '五', '六']
-    const str = `${d.getMonth() + 1}月${d.getDate()}日 周${week[d.getDay()]}`
-    this.setData({ todayStr: str })
   },
 
   checkLoginAndLoad() {
@@ -71,14 +75,19 @@ Page({
     const refreshStartedAt = Date.now()
     if (!silent) this.setData({ loading: true })
     if (manual) {
-      this.setData({ refreshing: true })
       wx.showLoading({ title: '刷新中...', mask: false })
     }
     try {
       const res = await api.getTodayMenu({ _t: Date.now() })
       const menu = res.data
       if (!menu) {
-        this.setData({ hasMenu: false, breakfastDishes: [], lunchDishes: [] })
+        this.setData({
+          hasMenu: false,
+          breakfastDishes: [],
+          lunchDishes: [],
+          menuDateLine: formatZhMenuDate(),
+          totalDishCount: 0,
+        })
         if (manual) {
           wx.showToast({ title: '已刷新，暂无菜单', icon: 'none', duration: 1200 })
         }
@@ -95,12 +104,19 @@ Page({
       const lunchDishes     = allDishes.filter(d => d.meal_type === 'lunch').map(normalize)
 
       const hasMenu = breakfastDishes.length > 0 || lunchDishes.length > 0
-      this.setData({ hasMenu, breakfastDishes, lunchDishes })
+      const totalDishCount = breakfastDishes.length + lunchDishes.length
+      this.setData({
+        hasMenu,
+        breakfastDishes,
+        lunchDishes,
+        menuDateLine: formatZhMenuDate(menu.menu_date),
+        totalDishCount,
+      })
       if (manual) {
         wx.showToast({ title: '已刷新', icon: 'success', duration: 900 })
       }
     } catch {
-      this.setData({ hasMenu: false })
+      this.setData({ hasMenu: false, menuDateLine: formatZhMenuDate(), totalDishCount: 0 })
     } finally {
       if (manual) {
         const remain = 600 - (Date.now() - refreshStartedAt)
@@ -109,13 +125,27 @@ Page({
       if (!silent) this.setData({ loading: false })
       if (manual) {
         wx.hideLoading()
-        this.setData({ refreshing: false })
       }
     }
   },
 
   onRefresh() {
-    if (this.data.refreshing || this.data.loading) return
-    this.loadMenu({ manual: true, silent: this.data.hasMenu })
+    if (this._manualRefreshBusy || this.data.loading) return
+    this._manualRefreshBusy = true
+    this.loadMenu({ manual: true, silent: this.data.hasMenu }).finally(() => {
+      this._manualRefreshBusy = false
+    })
+  },
+
+  goOrder() {
+    wx.navigateTo({ url: '/pages/order/order' })
+  },
+
+  goWish() {
+    wx.switchTab({ url: '/pages/wish/wish' })
+  },
+
+  goProfile() {
+    wx.switchTab({ url: '/pages/profile/profile' })
   },
 })
