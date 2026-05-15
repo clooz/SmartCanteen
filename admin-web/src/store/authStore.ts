@@ -7,6 +7,21 @@ export interface UserInfo {
   role: 'employee' | 'chef' | 'admin'
   company_id: number | null
   company_name: string | null
+  admin_role_id?: number | null
+  admin_role_code?: string | null
+  /** 管理端权限点（仅 chef/admin 登录时有值） */
+  permissions?: string[]
+  is_super_admin?: boolean
+}
+
+export function userHasPermission(user: UserInfo | null, key: string): boolean {
+  if (!user?.permissions?.length) return false
+  return user.permissions.includes(key)
+}
+
+export function userHasAnyPermission(user: UserInfo | null, keys: string[]): boolean {
+  if (!user?.permissions?.length) return false
+  return keys.some((k) => user.permissions!.includes(k))
 }
 
 export const authStore = {

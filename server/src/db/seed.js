@@ -5,6 +5,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const { pool } = require('./connection');
 const bcrypt = require('bcryptjs');
+const { CHEF_DEFAULT_CODE, SUPER_ADMIN_CODE } = require('../constants/permissions');
 
 // ── 工具函数 ──────────────────────────────────────────────
 const dayOffset = (days) => {
@@ -179,6 +180,31 @@ async function seed() {
     } catch (e) {
       console.warn(`   ⚠ 更新手机号失败 ${uname}:`, e.message);
     }
+  }
+
+  // 与 init.js migrateAdminRbac 补齐逻辑一致：仅跑 seed 时也要绑定 admin_role_id，否则厨师登录后 permissions 为空会进 403
+  console.log('🔐 尝试绑定管理端岗位（RBAC）…');
+  try {
+    const [cdRow] = await pool.query('SELECT id FROM admin_roles WHERE code = ? LIMIT 1', [CHEF_DEFAULT_CODE]);
+    if (cdRow.length) {
+      const [up] = await pool.query(
+        'UPDATE users SET admin_role_id = ? WHERE role = ? AND (admin_role_id IS NULL OR admin_role_id = 0)',
+        [cdRow[0].id, 'chef']
+      );
+      if (up.affectedRows) console.log(`   ✅ 已为 ${up.affectedRows} 名厨师绑定「厨师」岗位`);
+    } else {
+      console.warn('   ⚠ 未找到预置厨师岗位（请先执行一次数据库初始化以创建 admin_roles）');
+    }
+    const [sdRow] = await pool.query('SELECT id FROM admin_roles WHERE code = ? LIMIT 1', [SUPER_ADMIN_CODE]);
+    if (sdRow.length) {
+      const [up] = await pool.query(
+        'UPDATE users SET admin_role_id = ? WHERE role = ? AND admin_role_id IS NULL',
+        [sdRow[0].id, 'admin']
+      );
+      if (up.affectedRows) console.log(`   ✅ 已为 ${up.affectedRows} 名管理员补齐「超级管理员」岗位`);
+    }
+  } catch (e) {
+    console.warn('   ⚠ 绑定 admin_role_id 失败:', e.message);
   }
 
   // ── 2. 菜品 ─────────────────────────────────────────────

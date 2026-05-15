@@ -12,6 +12,7 @@ import {
 import { dishesApi } from '../../api/dishes'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
+import { filterBarRowStyle, filterBarCellStyle, filterBarLabelStyle } from '../../utils/filterToolbarLayout'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -390,49 +391,80 @@ export default function DishesPage() {
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增菜品</Button>
           </Space>
         }
-        filterLeft={
-          <>
-            <Text type="secondary" style={{ fontSize: 13 }}>分类</Text>
-            <Select placeholder="全部" allowClear style={{ width: 120 }}
-              onChange={v => setFilterCategory(v)} value={filterCategory}>
-              {CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
-            </Select>
-            <Text type="secondary" style={{ fontSize: 13 }}>名称</Text>
-            <Input.Search key={`d-lk-${dishToolbarKey}`} placeholder="搜索菜品名" onSearch={v => setFilterKeyword(v || undefined)} allowClear style={{ width: 180 }} />
-            <Text type="secondary" style={{ fontSize: 13 }}>上架</Text>
-            <Select placeholder="全部" allowClear style={{ width: 100 }} value={filterIsAvailable}
-              onChange={v => setFilterIsAvailable(v)}
-              options={[{ label: '上架', value: 1 }, { label: '下架', value: 0 }]}
-            />
-            <Text type="secondary" style={{ fontSize: 13 }}>价格</Text>
-            <InputNumber min={0} placeholder="最低" style={{ width: 88 }} value={filterPriceMin}
-              onChange={v => setFilterPriceMin(v === null ? undefined : Number(v))} />
-            <Text type="secondary" style={{ fontSize: 13 }}>~</Text>
-            <InputNumber min={0} placeholder="最高" style={{ width: 88 }} value={filterPriceMax}
-              onChange={v => setFilterPriceMax(v === null ? undefined : Number(v))} />
-          </>
-        }
-        filterRight={
-          <Space>
-            <Button onClick={resetDishListFilters}>重置筛选</Button>
-            <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
-            <Space.Compact>
-            <Tooltip title="列表视图">
-              <Button
-                icon={<UnorderedListOutlined />}
-                type={viewMode === 'list' ? 'primary' : 'default'}
-                onClick={() => switchView('list')}
+        filterBar={
+          <div style={filterBarRowStyle}>
+            <div style={filterBarCellStyle(140)}>
+              <Text type="secondary" style={filterBarLabelStyle}>分类</Text>
+              <Select
+                placeholder="全部"
+                allowClear
+                style={{ flex: 1, minWidth: 88, maxWidth: '100%' }}
+                onChange={v => setFilterCategory(v)}
+                value={filterCategory}
+              >
+                {CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
+              </Select>
+            </div>
+            <div style={filterBarCellStyle(180)}>
+              <Text type="secondary" style={filterBarLabelStyle}>名称</Text>
+              <Input.Search
+                key={`d-lk-${dishToolbarKey}`}
+                placeholder="搜索菜品名"
+                onSearch={v => setFilterKeyword(v || undefined)}
+                allowClear
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
               />
-            </Tooltip>
-            <Tooltip title="卡片视图">
-              <Button
-                icon={<AppstoreOutlined />}
-                type={viewMode === 'card' ? 'primary' : 'default'}
-                onClick={() => switchView('card')}
+            </div>
+            <div style={filterBarCellStyle(120)}>
+              <Text type="secondary" style={filterBarLabelStyle}>上架</Text>
+              <Select
+                placeholder="全部"
+                allowClear
+                style={{ flex: 1, minWidth: 72, maxWidth: '100%' }}
+                value={filterIsAvailable}
+                onChange={v => setFilterIsAvailable(v)}
+                options={[{ label: '上架', value: 1 }, { label: '下架', value: 0 }]}
               />
-            </Tooltip>
-          </Space.Compact>
-          </Space>
+            </div>
+            <div style={filterBarCellStyle(200, 'center')}>
+              <Text type="secondary" style={filterBarLabelStyle}>价格</Text>
+              <InputNumber
+                min={0}
+                placeholder="最低"
+                style={{ width: 88, maxWidth: '100%' }}
+                value={filterPriceMin}
+                onChange={v => setFilterPriceMin(v === null ? undefined : Number(v))}
+              />
+              <Text type="secondary" style={{ fontSize: 13 }}>~</Text>
+              <InputNumber
+                min={0}
+                placeholder="最高"
+                style={{ width: 88, maxWidth: '100%' }}
+                value={filterPriceMax}
+                onChange={v => setFilterPriceMax(v === null ? undefined : Number(v))}
+              />
+            </div>
+            <div style={filterBarCellStyle(200, 'flex-end')}>
+              <Button onClick={resetDishListFilters}>重置筛选</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
+              <Space.Compact>
+                <Tooltip title="列表视图">
+                  <Button
+                    icon={<UnorderedListOutlined />}
+                    type={viewMode === 'list' ? 'primary' : 'default'}
+                    onClick={() => switchView('list')}
+                  />
+                </Tooltip>
+                <Tooltip title="卡片视图">
+                  <Button
+                    icon={<AppstoreOutlined />}
+                    type={viewMode === 'card' ? 'primary' : 'default'}
+                    onClick={() => switchView('card')}
+                  />
+                </Tooltip>
+              </Space.Compact>
+            </div>
+          </div>
         }
       >
         <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />

@@ -3,10 +3,11 @@ import { flushSync } from 'react-dom'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ConfigProvider, App as AntApp, theme, Spin } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import { authStore } from './store/authStore'
+import { authStore, userHasPermission, type UserInfo } from './store/authStore'
 import PrivateRoute from './components/PrivateRoute'
 import AppLayout from './components/AppLayout'
 import LoginPage from './pages/login/LoginPage'
+import ForbiddenPage from './pages/ForbiddenPage'
 import './styles/global.css'
 
 const KitchenPage = lazy(() => import('./pages/kitchen/KitchenPage'))
@@ -18,6 +19,7 @@ const UsersPage = lazy(() => import('./pages/users/UsersPage'))
 const CompaniesPage = lazy(() => import('./pages/companies/CompaniesPage'))
 const RechargePage = lazy(() => import('./pages/recharge/RechargePage'))
 const WishPage = lazy(() => import('./pages/wish/WishPage'))
+const RbacRolesPage = lazy(() => import('./pages/rbac/RbacRolesPage'))
 
 function RouteFallback() {
   return (
@@ -42,9 +44,29 @@ function prefersThemeTransitionReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
+function firstHomePath(user: UserInfo): string {
+  const checks: [string, string][] = [
+    ['/kitchen', 'kitchen:view'],
+    ['/dishes', 'dishes:read'],
+    ['/menus', 'menus:read'],
+    ['/orders', 'orders:read'],
+    ['/report', 'orders:report'],
+    ['/wish', 'wish:read'],
+    ['/recharge', 'recharge:read'],
+    ['/users', 'users:read'],
+    ['/companies', 'companies:read'],
+  ]
+  for (const [path, perm] of checks) {
+    if (userHasPermission(user, perm)) return path
+  }
+  if (user.is_super_admin) return '/rbac'
+  return '/403'
+}
+
 function HomeRedirect() {
   const user = authStore.getUser()
-  return <Navigate to={user?.role === 'chef' ? '/kitchen' : '/kitchen'} replace />
+  if (!user) return <Navigate to="/login" replace />
+  return <Navigate to={firstHomePath(user)} replace />
 }
 
 export default function App() {
@@ -196,6 +218,7 @@ export default function App() {
           <Suspense fallback={<RouteFallback />}>
             <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/403" element={<ForbiddenPage />} />
             <Route path="/" element={
               <PrivateRoute
                 roles={['admin', 'chef']}
@@ -206,15 +229,16 @@ export default function App() {
               </PrivateRoute>
             }>
               <Route index element={<HomeRedirect />} />
-              <Route path="kitchen" element={<KitchenPage />} />
-              <Route path="dishes" element={<DishesPage />} />
-              <Route path="menus" element={<MenusPage />} />
-              <Route path="wish" element={<WishPage />} />
-              <Route path="orders" element={<PrivateRoute roles={['admin', 'chef']}><OrdersPage /></PrivateRoute>} />
-              <Route path="report" element={<PrivateRoute roles={['admin', 'chef']}><ReportPage /></PrivateRoute>} />
-              <Route path="recharge" element={<PrivateRoute roles={['admin']}><RechargePage /></PrivateRoute>} />
-              <Route path="users" element={<PrivateRoute roles={['admin']}><UsersPage /></PrivateRoute>} />
-              <Route path="companies" element={<PrivateRoute roles={['admin']}><CompaniesPage /></PrivateRoute>} />
+              <Route path="kitchen" element={<PrivateRoute permission="kitchen:view"><KitchenPage /></PrivateRoute>} />
+              <Route path="dishes" element={<PrivateRoute permission="dishes:read"><DishesPage /></PrivateRoute>} />
+              <Route path="menus" element={<PrivateRoute permission="menus:read"><MenusPage /></PrivateRoute>} />
+              <Route path="wish" element={<PrivateRoute permission="wish:read"><WishPage /></PrivateRoute>} />
+              <Route path="orders" element={<PrivateRoute permission="orders:read"><OrdersPage /></PrivateRoute>} />
+              <Route path="report" element={<PrivateRoute permission="orders:report"><ReportPage /></PrivateRoute>} />
+              <Route path="recharge" element={<PrivateRoute permission="recharge:read"><RechargePage /></PrivateRoute>} />
+              <Route path="users" element={<PrivateRoute permission="users:read"><UsersPage /></PrivateRoute>} />
+              <Route path="companies" element={<PrivateRoute permission="companies:read"><CompaniesPage /></PrivateRoute>} />
+              <Route path="rbac" element={<PrivateRoute superAdminOnly><RbacRolesPage /></PrivateRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

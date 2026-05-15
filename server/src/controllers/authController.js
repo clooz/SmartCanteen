@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db/connection');
 const { success, fail } = require('../utils/response');
+const { resolveUserRbac } = require('../services/rbacService');
 const {
   normalizePhone,
   normalizeEmail,
@@ -30,6 +31,21 @@ function publicUser(row) {
     company_code: row.company_code,
     has_phone: Boolean(row.phone),
     phone_masked: row.phone ? maskPhone(row.phone) : '',
+    admin_role_id: row.admin_role_id != null ? row.admin_role_id : null,
+    admin_role_code: row.admin_role_code || null,
+  };
+}
+
+async function enrichConsoleUserPayload(row) {
+  const base = publicUser(row);
+  if (row.role !== 'chef' && row.role !== 'admin') {
+    return { ...base, permissions: [], is_super_admin: false };
+  }
+  const rbac = await resolveUserRbac(row.id);
+  return {
+    ...base,
+    permissions: Array.from(rbac.permissionSet),
+    is_super_admin: rbac.isSuperAdmin,
   };
 }
 
@@ -52,9 +68,11 @@ const login = async (req, res) => {
     if (ph) {
       [rows] = await pool.query(
         `SELECT u.id, u.username, u.password, u.phone, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
+                u.admin_role_id, ar.code AS admin_role_code,
                 c.name AS company_name, c.code AS company_code
          FROM users u
          LEFT JOIN companies c ON u.company_id = c.id
+         LEFT JOIN admin_roles ar ON ar.id = u.admin_role_id
          WHERE u.phone = ? OR LOWER(TRIM(u.username)) = LOWER(?)`,
         [ph, raw]
       );
@@ -62,9 +80,11 @@ const login = async (req, res) => {
       const key = emailGuess || raw;
       [rows] = await pool.query(
         `SELECT u.id, u.username, u.password, u.phone, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
+                u.admin_role_id, ar.code AS admin_role_code,
                 c.name AS company_name, c.code AS company_code
          FROM users u
          LEFT JOIN companies c ON u.company_id = c.id
+         LEFT JOIN admin_roles ar ON ar.id = u.admin_role_id
          WHERE LOWER(TRIM(u.username)) = LOWER(?)`,
         [key]
       );
@@ -86,10 +106,11 @@ const login = async (req, res) => {
     }
 
     const token = generateToken(user);
+    const userPayload = await enrichConsoleUserPayload(user);
 
     return success(res, {
       token,
-      user: publicUser(user),
+      user: userPayload,
     }, '登录成功');
   } catch (err) {
     console.error('login error:', err);
@@ -143,9 +164,11 @@ const loginSms = async (req, res) => {
 
     const [rows] = await pool.query(
       `SELECT u.id, u.username, u.password, u.phone, u.nickname, u.avatar, u.role, u.company_id, u.is_active,
+              u.admin_role_id, ar.code AS admin_role_code,
               c.name AS company_name, c.code AS company_code
        FROM users u
        LEFT JOIN companies c ON u.company_id = c.id
+       LEFT JOIN admin_roles ar ON ar.id = u.admin_role_id
        WHERE u.phone = ?`,
       [ph]
     );
@@ -154,7 +177,8 @@ const loginSms = async (req, res) => {
     if (!user.is_active) return fail(res, '账号已被禁用，请联系管理员');
 
     const token = generateToken(user);
-    return success(res, { token, user: publicUser(user) }, '登录成功');
+    const userPayload = await enrichConsoleUserPayload(user);
+    return success(res, { token, user: userPayload }, '登录成功');
   } catch (err) {
     console.error('loginSms error:', err);
     return fail(res, '服务器错误', 500);
@@ -165,9 +189,11 @@ const getProfile = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT u.id, u.username, u.phone, u.nickname, u.avatar, u.role, u.company_id, u.created_at,
+              u.admin_role_id, ar.code AS admin_role_code,
               c.name AS company_name, c.code AS company_code
        FROM users u
        LEFT JOIN companies c ON u.company_id = c.id
+       LEFT JOIN admin_roles ar ON ar.id = u.admin_role_id
        WHERE u.id = ?`,
       [req.user.id]
     );
@@ -177,12 +203,8 @@ const getProfile = async (req, res) => {
     }
 
     const row = rows[0];
-    const data = {
-      ...row,
-      has_phone: Boolean(row.phone),
-      phone_masked: row.phone ? maskPhone(row.phone) : '',
-    };
-    delete data.phone;
+    const data = await enrichConsoleUserPayload(row);
+    data.created_at = row.created_at;
     return success(res, data);
   } catch (err) {
     console.error('getProfile error:', err);

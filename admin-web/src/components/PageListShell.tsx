@@ -9,6 +9,8 @@ export type PageListShellProps = {
   headerExtra?: ReactNode
   /** 默认用 Card 包裹内容（与菜品管理一致）；看板等全宽页面用 plain */
   variant?: 'card' | 'plain'
+  /** 整行筛选区（与 filterLeft / filterRight 互斥，传入时仅渲染此项） */
+  filterBar?: ReactNode
   filterLeft?: ReactNode
   filterRight?: ReactNode
   children: ReactNode
@@ -22,11 +24,12 @@ export default function PageListShell({
   subtitle,
   headerExtra,
   variant = 'card',
+  filterBar,
   filterLeft,
   filterRight,
   children,
 }: PageListShellProps) {
-  const hasFilter = filterLeft != null || filterRight != null
+  const hasFilter = filterBar != null || filterLeft != null || filterRight != null
 
   const header = (
     <div
@@ -53,21 +56,27 @@ export default function PageListShell({
 
   const filterRow =
     hasFilter ? (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: 16,
-          flexWrap: 'wrap',
-          gap: 12,
-        }}
-      >
-        <Space wrap style={{ alignItems: 'center' }}>
-          {filterLeft}
-        </Space>
-        <Space style={{ marginLeft: 'auto' }}>{filterRight}</Space>
-      </div>
+      filterBar != null ? (
+        <div style={{ width: '100%', marginBottom: 16 }}>{filterBar}</div>
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            width: '100%',
+            marginBottom: 16,
+            gap: 12,
+          }}
+        >
+          <Space wrap style={{ flex: '1 1 auto', minWidth: 0, alignItems: 'center' }}>
+            {filterLeft}
+          </Space>
+          {filterRight != null ? (
+            <Space style={{ flexShrink: 0, marginLeft: 'auto', alignItems: 'center' }}>{filterRight}</Space>
+          ) : null}
+        </div>
+      )
     ) : null
 
   if (variant === 'plain') {

@@ -4,6 +4,7 @@ import { BarChartOutlined, TeamOutlined, FireOutlined, ReloadOutlined } from '@a
 import PageListShell from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
 import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
+import { filterBarRowStyle, filterBarCellStyle, filterBarLabelStyle } from '../../utils/filterToolbarLayout'
 import { ordersApi } from '../../api/orders'
 import { authApi } from '../../api/auth'
 import dayjs, { Dayjs } from 'dayjs'
@@ -138,27 +139,37 @@ export default function ReportPage() {
     <div>
       <PageListShell
         title="消费报表"
-        filterLeft={
-          <>
-            <Text type="secondary" style={{ fontSize: 13 }}>统计区间</Text>
-            <RangePicker
-              value={dateRange}
-              onChange={(v) => v && setDateRange(v as [Dayjs, Dayjs])}
-            />
-            <Text type="secondary" style={{ fontSize: 13 }}>所属公司</Text>
-            <Select placeholder="全部公司" allowClear style={{ width: 160 }}
-              value={filterCompany} onChange={setFilterCompany}>
-              {companies.map((c: any) => (
-                <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>
-              ))}
-            </Select>
-          </>
-        }
-        filterRight={
-          <Space>
-            <Button onClick={resetReportFilters}>重置条件</Button>
-            <Button type="primary" icon={<ReloadOutlined />} onClick={fetchReport} loading={loading}>查询</Button>
-          </Space>
+        filterBar={
+          <div style={filterBarRowStyle}>
+            <div style={filterBarCellStyle(280)}>
+              <Text type="secondary" style={filterBarLabelStyle}>统计区间</Text>
+              <RangePicker
+                value={dateRange}
+                onChange={(v) => v && setDateRange(v as [Dayjs, Dayjs])}
+                style={{ flex: 1, minWidth: 220, maxWidth: '100%' }}
+              />
+            </div>
+            <div style={filterBarCellStyle(160)}>
+              <Text type="secondary" style={filterBarLabelStyle}>所属公司</Text>
+              <Select
+                placeholder="全部公司"
+                allowClear
+                style={{ flex: 1, minWidth: 120, maxWidth: '100%' }}
+                value={filterCompany}
+                onChange={setFilterCompany}
+              >
+                {companies.map((c: any) => (
+                  <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>
+                ))}
+              </Select>
+            </div>
+            <div style={filterBarCellStyle(220, 'flex-end')}>
+              <Space>
+                <Button onClick={resetReportFilters}>重置条件</Button>
+                <Button type="primary" icon={<ReloadOutlined />} onClick={fetchReport} loading={loading}>查询</Button>
+              </Space>
+            </div>
+          </div>
         }
       >
         <TableLoadErrorAlert error={loadError} onRetry={fetchReport} />

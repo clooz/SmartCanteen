@@ -321,9 +321,15 @@ const updateOrderStatus = async (req, res) => {
       if (order.user_id !== req.user.id) return fail(res, '无权操作', 403);
       if (status !== 'cancelled') return fail(res, '员工只能取消订单', 403);
       if (order.status !== 'pending') return fail(res, '只有待接单的订单才能取消');
+    } else if (req.user.role === 'chef' || req.user.role === 'admin') {
+      if (!req.rbac || !req.rbac.permissionSet.has('orders:status:update')) {
+        return fail(res, '权限不足', 403);
+      }
+    } else {
+      return fail(res, '权限不足', 403);
     }
 
-    // 厨师/管理员可以更新所有状态
+    // 厨师/管理员可以更新所有状态（已通过 orders:status:update）
     const validTransitions = {
       pending: ['confirmed', 'cancelled'],
       confirmed: ['ready', 'cancelled'],

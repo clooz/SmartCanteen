@@ -4,6 +4,7 @@ import { CheckOutlined, CloseOutlined, ReloadOutlined, CheckCircleOutlined } fro
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
 import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
+import { filterBarRowStyle, filterBarCellStyle, filterBarLabelStyle } from '../../utils/filterToolbarLayout'
 import { adminApi } from '../../api/admin'
 import dayjs from 'dayjs'
 
@@ -209,22 +210,55 @@ export default function RechargePage() {
     <div>
       <PageListShell
         title="饭卡充值审核"
-        filterLeft={
-          <>
-            <Text type="secondary" style={{ fontSize: 13 }}>状态</Text>
-            <Select value={filterStatus} onChange={(v) => { setFilterStatus(v); setPage(1) }} style={{ width: 120 }} allowClear placeholder="全部">
-              {Object.entries(STATUS_MAP).map(([k, v]) => <Option key={k} value={k}>{v.label}</Option>)}
-            </Select>
-            <Text type="secondary" style={{ fontSize: 13 }}>用户</Text>
-            <Input.Search key={`r-lk-${rechargeListFilterKey}-u`} placeholder="昵称" allowClear style={{ width: 130 }}
-              onSearch={(v) => { setColUserName(v || undefined); setPage(1) }} />
-            <Text type="secondary" style={{ fontSize: 13 }}>公司</Text>
-            <Input.Search key={`r-lk-${rechargeListFilterKey}-c`} placeholder="名称" allowClear style={{ width: 140 }}
-              onSearch={(v) => { setColCompanyName(v || undefined); setPage(1) }} />
-            <Text type="secondary" style={{ fontSize: 13 }}>备注</Text>
-            <Input.Search key={`r-lk-${rechargeListFilterKey}-m`} placeholder="模糊" allowClear style={{ width: 140 }}
-              onSearch={(v) => { setColRemark(v || undefined); setPage(1) }} />
-          </>
+        filterBar={
+          <div style={filterBarRowStyle}>
+            <div style={filterBarCellStyle(120)}>
+              <Text type="secondary" style={filterBarLabelStyle}>状态</Text>
+              <Select
+                value={filterStatus}
+                onChange={(v) => { setFilterStatus(v); setPage(1) }}
+                style={{ flex: 1, minWidth: 88, maxWidth: '100%' }}
+                allowClear
+                placeholder="全部"
+              >
+                {Object.entries(STATUS_MAP).map(([k, v]) => <Option key={k} value={k}>{v.label}</Option>)}
+              </Select>
+            </div>
+            <div style={filterBarCellStyle(140)}>
+              <Text type="secondary" style={filterBarLabelStyle}>用户</Text>
+              <Input.Search
+                key={`r-lk-${rechargeListFilterKey}-u`}
+                placeholder="昵称"
+                allowClear
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                onSearch={(v) => { setColUserName(v || undefined); setPage(1) }}
+              />
+            </div>
+            <div style={filterBarCellStyle(150)}>
+              <Text type="secondary" style={filterBarLabelStyle}>公司</Text>
+              <Input.Search
+                key={`r-lk-${rechargeListFilterKey}-c`}
+                placeholder="名称"
+                allowClear
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                onSearch={(v) => { setColCompanyName(v || undefined); setPage(1) }}
+              />
+            </div>
+            <div style={filterBarCellStyle(150)}>
+              <Text type="secondary" style={filterBarLabelStyle}>备注</Text>
+              <Input.Search
+                key={`r-lk-${rechargeListFilterKey}-m`}
+                placeholder="模糊"
+                allowClear
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                onSearch={(v) => { setColRemark(v || undefined); setPage(1) }}
+              />
+            </div>
+            <div style={filterBarCellStyle(200, 'flex-end')}>
+              <Button onClick={resetRechargeFilters}>重置筛选</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
+            </div>
+          </div>
         }
         headerExtra={
           selectedRowKeys.length > 0 ? (
@@ -236,12 +270,6 @@ export default function RechargePage() {
                 onClick={handleBatchApprove}>批量完成</Button>
             </Space>
           ) : undefined
-        }
-        filterRight={
-          <>
-            <Button onClick={resetRechargeFilters}>重置筛选</Button>
-            <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
-          </>
         }
       >
         <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />

@@ -8,6 +8,7 @@ import './WishPage.css'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
 import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
+import { filterBarRowStyle, filterBarCellStyle, filterBarLabelStyle } from '../../utils/filterToolbarLayout'
 import { wishApi } from '../../api/wish'
 import dayjs from 'dayjs'
 
@@ -353,32 +354,57 @@ export default function WishPage() {
             </Button>
           </Space>
         }
-        filterLeft={
-          <>
-            <Text type="secondary" style={{ fontSize: 13 }}>标题</Text>
-            <Input allowClear placeholder="模糊匹配" style={{ width: 160 }} value={fTitle}
-              onChange={e => setFTitle(e.target.value || undefined)} />
-            <Text type="secondary" style={{ fontSize: 13 }}>状态</Text>
-            <Select allowClear placeholder="全部" style={{ width: 120 }} value={fActivityStatus}
-              onChange={setFActivityStatus}
-              options={[
-                { label: '进行中', value: 'active' },
-                { label: '已结束', value: 'closed' },
-              ]}
-            />
-            <Text type="secondary" style={{ fontSize: 13 }}>发起人</Text>
-            <Input allowClear placeholder="模糊匹配" style={{ width: 130 }} value={fCreator}
-              onChange={e => setFCreator(e.target.value || undefined)} />
-            <Text type="secondary" style={{ fontSize: 13 }}>许愿条数</Text>
-            <InputNumber min={0} placeholder="精确" style={{ width: 100 }} value={fItemCount}
-              onChange={v => setFItemCount(v === null ? undefined : Number(v))} />
-          </>
-        }
-        filterRight={
-          <>
-            <Button onClick={resetFilters}>重置筛选</Button>
-            <Button icon={<ReloadOutlined />} onClick={() => fetchActivities()}>刷新</Button>
-          </>
+        filterBar={
+          <div style={filterBarRowStyle}>
+            <div style={filterBarCellStyle(150)}>
+              <Text type="secondary" style={filterBarLabelStyle}>标题</Text>
+              <Input
+                allowClear
+                placeholder="模糊匹配"
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                value={fTitle}
+                onChange={e => setFTitle(e.target.value || undefined)}
+              />
+            </div>
+            <div style={filterBarCellStyle(130)}>
+              <Text type="secondary" style={filterBarLabelStyle}>状态</Text>
+              <Select
+                allowClear
+                placeholder="全部"
+                style={{ flex: 1, minWidth: 88, maxWidth: '100%' }}
+                value={fActivityStatus}
+                onChange={setFActivityStatus}
+                options={[
+                  { label: '进行中', value: 'active' },
+                  { label: '已结束', value: 'closed' },
+                ]}
+              />
+            </div>
+            <div style={filterBarCellStyle(140)}>
+              <Text type="secondary" style={filterBarLabelStyle}>发起人</Text>
+              <Input
+                allowClear
+                placeholder="模糊匹配"
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                value={fCreator}
+                onChange={e => setFCreator(e.target.value || undefined)}
+              />
+            </div>
+            <div style={filterBarCellStyle(120)}>
+              <Text type="secondary" style={filterBarLabelStyle}>许愿条数</Text>
+              <InputNumber
+                min={0}
+                placeholder="精确"
+                style={{ flex: 1, minWidth: 72, maxWidth: '100%' }}
+                value={fItemCount}
+                onChange={v => setFItemCount(v === null ? undefined : Number(v))}
+              />
+            </div>
+            <div style={filterBarCellStyle(200, 'flex-end')}>
+              <Button onClick={resetFilters}>重置筛选</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => fetchActivities()}>刷新</Button>
+            </div>
+          </div>
         }
       >
         <TableLoadErrorAlert error={loadError} onRetry={() => fetchActivities()} />

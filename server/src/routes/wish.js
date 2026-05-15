@@ -5,29 +5,23 @@ const {
   getWishItems, createWishItem, voteWishItem, unvoteWishItem, adoptWishItem,
   getComments, createComment, deleteComment
 } = require('../controllers/wishController');
-const { authenticate, authorize } = require('../middlewares/auth');
+const { authenticate, authorize, requireConsoleUser, loadRbac, requirePermission } = require('../middlewares/auth');
 
-// 所有已登录用户可查看活动和愿望
 router.get('/activities', authenticate, getActivities);
 router.get('/activities/:activity_id/items', authenticate, getWishItems);
 
-// 管理员/厨师管理活动
-router.post('/activities', authenticate, authorize('admin', 'chef'), createActivity);
-router.put('/activities/:id/close', authenticate, authorize('admin', 'chef'), closeActivity);
-router.put('/activities/:id/reopen', authenticate, authorize('admin', 'chef'), reopenActivity);
-router.put('/activities/:id', authenticate, authorize('admin', 'chef'), updateActivity);
+router.post('/activities', authenticate, requireConsoleUser, loadRbac, requirePermission('wish:manage'), createActivity);
+router.put('/activities/:id/close', authenticate, requireConsoleUser, loadRbac, requirePermission('wish:manage'), closeActivity);
+router.put('/activities/:id/reopen', authenticate, requireConsoleUser, loadRbac, requirePermission('wish:manage'), reopenActivity);
+router.put('/activities/:id', authenticate, requireConsoleUser, loadRbac, requirePermission('wish:manage'), updateActivity);
 
-// 员工提交许愿
 router.post('/activities/:activity_id/items', authenticate, authorize('employee'), createWishItem);
 
-// 所有登录用户可投票
 router.post('/items/:item_id/vote', authenticate, voteWishItem);
 router.delete('/items/:item_id/vote', authenticate, unvoteWishItem);
 
-// 管理员/厨师采纳愿望
-router.post('/items/:item_id/adopt', authenticate, authorize('admin', 'chef'), adoptWishItem);
+router.post('/items/:item_id/adopt', authenticate, requireConsoleUser, loadRbac, requirePermission('wish:manage'), adoptWishItem);
 
-// 评论（所有登录用户可查看和发评论，只能删自己的；管理员/厨师也可删）
 router.get('/items/:item_id/comments', authenticate, getComments);
 router.post('/items/:item_id/comments', authenticate, createComment);
 router.delete('/items/:item_id/comments/:comment_id', authenticate, deleteComment);

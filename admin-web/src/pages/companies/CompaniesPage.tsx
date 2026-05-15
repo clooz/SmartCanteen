@@ -19,6 +19,7 @@ import { PlusOutlined, EditOutlined, ReloadOutlined, DeleteOutlined } from '@ant
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
 import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
+import { filterBarRowStyle, filterBarCellStyle, filterBarLabelStyle } from '../../utils/filterToolbarLayout'
 import { adminApi } from '../../api/admin'
 
 const { Text } = Typography
@@ -187,12 +188,6 @@ export default function CompaniesPage() {
       render: (v: string) => ellipsis(v, 28),
     },
     {
-      title: '统一社会信用代码',
-      dataIndex: 'credit_code',
-      width: 170,
-      render: (v: string) => ellipsis(v, 14),
-    },
-    {
       title: '状态',
       dataIndex: 'is_active',
       width: 88,
@@ -237,12 +232,6 @@ export default function CompaniesPage() {
         </div>
       ),
       onFilter: (v: any, r: any) => (v == null || v === '' ? true : Number(r.member_count) === Number(v)),
-    },
-    {
-      title: '备注',
-      dataIndex: 'remark',
-      width: 160,
-      render: (v: string) => ellipsis(v, 20),
     },
     {
       title: '操作',
@@ -293,28 +282,54 @@ export default function CompaniesPage() {
       <PageListShell
         title="公司管理"
         headerExtra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增公司</Button>}
-        filterLeft={
-          <>
-            <Text type="secondary" style={{ fontSize: 13 }}>编码</Text>
-            <Input allowClear placeholder="模糊匹配" style={{ width: 140 }} value={fCode}
-              onChange={e => setFCode(e.target.value || undefined)} />
-            <Text type="secondary" style={{ fontSize: 13 }}>名称</Text>
-            <Input allowClear placeholder="模糊匹配" style={{ width: 180 }} value={fName}
-              onChange={e => setFName(e.target.value || undefined)} />
-            <Text type="secondary" style={{ fontSize: 13 }}>人数</Text>
-            <InputNumber min={0} placeholder="精确" style={{ width: 100 }} value={fMember}
-              onChange={v => setFMember(v === null ? undefined : Number(v))} />
-            <Text type="secondary" style={{ fontSize: 13 }}>状态</Text>
-            <Select allowClear placeholder="全部" style={{ width: 100 }} value={fActive}
-              onChange={(v) => setFActive(v)}
-              options={[{ value: '1', label: '启用' }, { value: '0', label: '停用' }]} />
-          </>
-        }
-        filterRight={
-          <>
-            <Button onClick={resetFilters}>重置筛选</Button>
-            <Button icon={<ReloadOutlined />} onClick={() => fetchData()}>刷新</Button>
-          </>
+        filterBar={
+          <div style={filterBarRowStyle}>
+            <div style={filterBarCellStyle(130)}>
+              <Text type="secondary" style={filterBarLabelStyle}>编码</Text>
+              <Input
+                allowClear
+                placeholder="模糊匹配"
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                value={fCode}
+                onChange={e => setFCode(e.target.value || undefined)}
+              />
+            </div>
+            <div style={filterBarCellStyle(160)}>
+              <Text type="secondary" style={filterBarLabelStyle}>名称</Text>
+              <Input
+                allowClear
+                placeholder="模糊匹配"
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                value={fName}
+                onChange={e => setFName(e.target.value || undefined)}
+              />
+            </div>
+            <div style={filterBarCellStyle(120)}>
+              <Text type="secondary" style={filterBarLabelStyle}>人数</Text>
+              <InputNumber
+                min={0}
+                placeholder="精确"
+                style={{ flex: 1, minWidth: 72, maxWidth: '100%' }}
+                value={fMember}
+                onChange={v => setFMember(v === null ? undefined : Number(v))}
+              />
+            </div>
+            <div style={filterBarCellStyle(120)}>
+              <Text type="secondary" style={filterBarLabelStyle}>状态</Text>
+              <Select
+                allowClear
+                placeholder="全部"
+                style={{ flex: 1, minWidth: 72, maxWidth: '100%' }}
+                value={fActive}
+                onChange={(v) => setFActive(v)}
+                options={[{ value: '1', label: '启用' }, { value: '0', label: '停用' }]}
+              />
+            </div>
+            <div style={filterBarCellStyle(180, 'flex-end')}>
+              <Button onClick={resetFilters}>重置筛选</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => fetchData()}>刷新</Button>
+            </div>
+          </div>
         }
       >
         <TableLoadErrorAlert error={loadError} onRetry={() => fetchData()} />
@@ -324,7 +339,7 @@ export default function CompaniesPage() {
           dataSource={pagedData}
           columns={columns}
           loading={loading}
-          scroll={{ x: 1280 }}
+          scroll={{ x: 980 }}
           locale={tableListLocale}
           pagination={standardTablePagination({
             current: page,

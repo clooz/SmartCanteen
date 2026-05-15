@@ -1,17 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const { getDishes, getDishById, createDish, updateDish, deleteDish, getCategories } = require('../controllers/dishController');
-const { authenticate, authorize } = require('../middlewares/auth');
+const {
+  authenticate,
+  requireConsoleUser,
+  loadRbac,
+  requirePermission,
+  allowEmployeeOrPermission,
+} = require('../middlewares/auth');
 const upload = require('../utils/upload');
 
-// 公开接口（已登录用户可访问）
-router.get('/', authenticate, getDishes);
-router.get('/categories', authenticate, getCategories);
-router.get('/:id', authenticate, getDishById);
+router.get('/', authenticate, loadRbac, allowEmployeeOrPermission('dishes:read'), getDishes);
+router.get('/categories', authenticate, loadRbac, allowEmployeeOrPermission('dishes:read'), getCategories);
+router.get('/:id', authenticate, loadRbac, allowEmployeeOrPermission('dishes:read'), getDishById);
 
-// 管理员专属接口
-router.post('/', authenticate, authorize('admin'), upload.single('image'), createDish);
-router.put('/:id', authenticate, authorize('admin'), upload.single('image'), updateDish);
-router.delete('/:id', authenticate, authorize('admin'), deleteDish);
+router.post('/', authenticate, requireConsoleUser, loadRbac, requirePermission('dishes:write'), upload.single('image'), createDish);
+router.put('/:id', authenticate, requireConsoleUser, loadRbac, requirePermission('dishes:write'), upload.single('image'), updateDish);
+router.delete('/:id', authenticate, requireConsoleUser, loadRbac, requirePermission('dishes:write'), deleteDish);
 
 module.exports = router;

@@ -4,6 +4,7 @@ import { ReloadOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/i
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
 import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
+import { filterBarRowStyle, filterBarCellStyle, filterBarLabelStyle } from '../../utils/filterToolbarLayout'
 import { ordersApi } from '../../api/orders'
 import dayjs from 'dayjs'
 
@@ -27,7 +28,7 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [filterStatus, setFilterStatus] = useState<string>()
-  const [filterDate, setFilterDate] = useState<string>(dayjs().format('YYYY-MM-DD'))
+  const [filterDate, setFilterDate] = useState<string>('')
   const [detailOrder, setDetailOrder] = useState<any>(null)
 
   const [colOrderNo, setColOrderNo] = useState<string | undefined>()
@@ -208,31 +209,65 @@ export default function OrdersPage() {
     <div>
       <PageListShell
         title="订单管理"
-        filterLeft={
-          <>
-            <Text type="secondary" style={{ fontSize: 13 }}>状态</Text>
-            <Select placeholder="全部" allowClear style={{ width: 120 }}
-              value={filterStatus}
-              onChange={(v) => { setFilterStatus(v); setPage(1) }}>
-              {Object.entries(STATUS_MAP).map(([k, v]) => <Option key={k} value={k}>{v.label}</Option>)}
-            </Select>
-            <Text type="secondary" style={{ fontSize: 13 }}>下单日</Text>
-            <DatePicker
-              value={filterDate ? dayjs(filterDate) : null}
-              onChange={(d) => { setFilterDate(d ? d.format('YYYY-MM-DD') : ''); setPage(1) }}
-              placeholder="全部日期"
-              allowClear
-            />
-            <Text type="secondary" style={{ fontSize: 13 }}>订单号</Text>
-            <Input.Search key={`o-lk-${ordersListFilterKey}-no`} placeholder="模糊" allowClear style={{ width: 150 }}
-              onSearch={(v) => { setColOrderNo(v || undefined); setPage(1) }} />
-            <Text type="secondary" style={{ fontSize: 13 }}>用户</Text>
-            <Input.Search key={`o-lk-${ordersListFilterKey}-user`} placeholder="昵称" allowClear style={{ width: 130 }}
-              onSearch={(v) => { setColUserName(v || undefined); setPage(1) }} />
-            <Text type="secondary" style={{ fontSize: 13 }}>公司</Text>
-            <Input.Search key={`o-lk-${ordersListFilterKey}-co`} placeholder="名称" allowClear style={{ width: 140 }}
-              onSearch={(v) => { setColCompanyName(v || undefined); setPage(1) }} />
-          </>
+        filterBar={
+          <div style={filterBarRowStyle}>
+            <div style={filterBarCellStyle(120)}>
+              <Text type="secondary" style={filterBarLabelStyle}>状态</Text>
+              <Select
+                placeholder="全部"
+                allowClear
+                style={{ flex: 1, minWidth: 88, maxWidth: '100%' }}
+                value={filterStatus}
+                onChange={(v) => { setFilterStatus(v); setPage(1) }}
+              >
+                {Object.entries(STATUS_MAP).map(([k, v]) => <Option key={k} value={k}>{v.label}</Option>)}
+              </Select>
+            </div>
+            <div style={filterBarCellStyle(140)}>
+              <Text type="secondary" style={filterBarLabelStyle}>下单日</Text>
+              <DatePicker
+                style={{ flex: 1, minWidth: 110, maxWidth: '100%' }}
+                value={filterDate ? dayjs(filterDate) : null}
+                onChange={(d) => { setFilterDate(d ? d.format('YYYY-MM-DD') : ''); setPage(1) }}
+                placeholder="全部日期"
+                allowClear
+              />
+            </div>
+            <div style={filterBarCellStyle(150)}>
+              <Text type="secondary" style={filterBarLabelStyle}>订单号</Text>
+              <Input.Search
+                key={`o-lk-${ordersListFilterKey}-no`}
+                placeholder="模糊"
+                allowClear
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                onSearch={(v) => { setColOrderNo(v || undefined); setPage(1) }}
+              />
+            </div>
+            <div style={filterBarCellStyle(140)}>
+              <Text type="secondary" style={filterBarLabelStyle}>用户</Text>
+              <Input.Search
+                key={`o-lk-${ordersListFilterKey}-user`}
+                placeholder="昵称"
+                allowClear
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                onSearch={(v) => { setColUserName(v || undefined); setPage(1) }}
+              />
+            </div>
+            <div style={filterBarCellStyle(150)}>
+              <Text type="secondary" style={filterBarLabelStyle}>公司</Text>
+              <Input.Search
+                key={`o-lk-${ordersListFilterKey}-co`}
+                placeholder="名称"
+                allowClear
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                onSearch={(v) => { setColCompanyName(v || undefined); setPage(1) }}
+              />
+            </div>
+            <div style={filterBarCellStyle(180, 'flex-end')}>
+              <Button onClick={resetOrderFilters}>重置筛选</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
+            </div>
+          </div>
         }
         headerExtra={
           selectedRowKeys.length > 0 ? (
@@ -246,12 +281,6 @@ export default function OrdersPage() {
                 onClick={handleBatchCancel}>批量取消</Button>
             </Space>
           ) : undefined
-        }
-        filterRight={
-          <>
-            <Button onClick={resetOrderFilters}>重置筛选</Button>
-            <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
-          </>
         }
       >
         <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />

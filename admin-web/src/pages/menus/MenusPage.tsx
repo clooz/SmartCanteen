@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
+import { filterBarRowStyle, filterBarCellStyle, filterBarLabelStyle } from '../../utils/filterToolbarLayout'
 import { menusApi } from '../../api/menus'
 import { dishesApi } from '../../api/dishes'
 import { textFilterDropdown } from '../../utils/tableColumnFilters'
@@ -673,41 +674,45 @@ export default function MenusPage() {
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增菜单</Button>
           </Space>
         }
-        filterLeft={
-          <>
-            <Text type="secondary" style={{ fontSize: 13 }}>菜单日期</Text>
-            <DatePicker
-              allowClear
-              placeholder="选择日期"
-              value={colMenuDate ? dayjs(colMenuDate) : null}
-              onChange={(d) => { setColMenuDate(d ? d.format('YYYY-MM-DD') : undefined); setPage(1) }}
-              style={{ width: 148 }}
-            />
-            <Text type="secondary" style={{ fontSize: 13 }}>状态</Text>
-            <Select
-              allowClear
-              placeholder="全部状态"
-              style={{ width: 128 }}
-              value={colStatus}
-              onChange={(v) => { setColStatus(v); setPage(1) }}
-              options={statusFilters.map(f => ({ label: f.text, value: f.value }))}
-            />
-            <Text type="secondary" style={{ fontSize: 13 }}>创建人</Text>
-            <Input.Search
-              key={listFilterKey}
-              allowClear
-              placeholder="昵称或用户名"
-              style={{ width: 200 }}
-              defaultValue={colCreator}
-              onSearch={(v) => { setColCreator(v || undefined); setPage(1) }}
-            />
-          </>
-        }
-        filterRight={
-          <>
-            <Button onClick={resetListFilters}>重置筛选</Button>
-            <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
-          </>
+        filterBar={
+          <div style={filterBarRowStyle}>
+            <div style={filterBarCellStyle(150)}>
+              <Text type="secondary" style={filterBarLabelStyle}>菜单日期</Text>
+              <DatePicker
+                allowClear
+                placeholder="选择日期"
+                value={colMenuDate ? dayjs(colMenuDate) : null}
+                onChange={(d) => { setColMenuDate(d ? d.format('YYYY-MM-DD') : undefined); setPage(1) }}
+                style={{ flex: 1, minWidth: 120, maxWidth: '100%' }}
+              />
+            </div>
+            <div style={filterBarCellStyle(130)}>
+              <Text type="secondary" style={filterBarLabelStyle}>状态</Text>
+              <Select
+                allowClear
+                placeholder="全部状态"
+                style={{ flex: 1, minWidth: 96, maxWidth: '100%' }}
+                value={colStatus}
+                onChange={(v) => { setColStatus(v); setPage(1) }}
+                options={statusFilters.map(f => ({ label: f.text, value: f.value }))}
+              />
+            </div>
+            <div style={filterBarCellStyle(200)}>
+              <Text type="secondary" style={filterBarLabelStyle}>创建人</Text>
+              <Input.Search
+                key={listFilterKey}
+                allowClear
+                placeholder="昵称或用户名"
+                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
+                defaultValue={colCreator}
+                onSearch={(v) => { setColCreator(v || undefined); setPage(1) }}
+              />
+            </div>
+            <div style={filterBarCellStyle(180, 'flex-end')}>
+              <Button onClick={resetListFilters}>重置筛选</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
+            </div>
+          </div>
         }
       >
         <div

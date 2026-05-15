@@ -15,12 +15,18 @@ request.interceptors.request.use((config) => {
   return config
 })
 
+function skipToast(config: unknown): boolean {
+  return Boolean(config && typeof config === 'object' && (config as { skipErrorToast?: boolean }).skipErrorToast)
+}
+
 // 响应拦截：统一错误提示
 request.interceptors.response.use(
   (response) => {
     const data = response.data
     if (data.code !== 0) {
-      message.error(data.message || '请求失败')
+      if (!skipToast(response.config)) {
+        message.error(data.message || '请求失败')
+      }
       return Promise.reject(new Error(data.message))
     }
     return data
@@ -30,7 +36,7 @@ request.interceptors.response.use(
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       window.location.href = '/login'
-    } else {
+    } else if (!skipToast(error.config)) {
       message.error(error.response?.data?.message || '网络错误，请稍后重试')
     }
     return Promise.reject(error)

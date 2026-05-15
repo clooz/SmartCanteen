@@ -420,6 +420,145 @@ async function migrateComments() {
   }
 }
 
+async function migrateAdminRbac() {
+  const {
+    ALL_KEYS,
+    SYSTEM_ADMIN_KEYS,
+    CHEF_DEFAULT_KEYS,
+    SUPER_ADMIN_CODE,
+    SYSTEM_ADMIN_CODE,
+    CHEF_DEFAULT_CODE,
+  } = require('../constants/permissions');
+
+  const [arTable] = await pool.query(
+    `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admin_roles'`
+  );
+  if (!arTable.length) {
+    console.log('🔄 迁移：创建 admin_roles / admin_role_permissions / admin_audit_logs …');
+    await pool.query(`
+      CREATE TABLE admin_roles (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(64) NOT NULL UNIQUE COMMENT '岗位编码',
+        name VARCHAR(100) NOT NULL COMMENT '展示名',
+        description VARCHAR(500) DEFAULT '' COMMENT '说明',
+        is_system TINYINT(1) NOT NULL DEFAULT 0 COMMENT '系统预置不可删',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) COMMENT='管理端后台岗位'
+    `);
+    await pool.query(`
+      CREATE TABLE admin_role_permissions (
+        role_id INT NOT NULL,
+        permission_key VARCHAR(80) NOT NULL,
+        PRIMARY KEY (role_id, permission_key),
+        FOREIGN KEY (role_id) REFERENCES admin_roles(id) ON DELETE CASCADE
+      ) COMMENT='岗位-权限点'
+    `);
+    await pool.query(`
+      CREATE TABLE admin_audit_logs (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        actor_id INT NOT NULL,
+        action VARCHAR(64) NOT NULL,
+        detail_json TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_actor (actor_id),
+        KEY idx_created (created_at),
+        FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
+      ) COMMENT='管理端操作审计'
+    `);
+    console.log('   ✅ RBAC 表已创建');
+  }
+
+  const [uCol] = await pool.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'admin_role_id'`
+  );
+  if (!uCol.length) {
+    console.log('🔄 迁移：users 增加 admin_role_id …');
+    await pool.query(`
+      ALTER TABLE users
+        ADD COLUMN admin_role_id INT DEFAULT NULL COMMENT '后台岗位ID' AFTER role,
+        ADD KEY idx_users_admin_role (admin_role_id),
+        ADD CONSTRAINT fk_users_admin_role FOREIGN KEY (admin_role_id) REFERENCES admin_roles(id) ON DELETE SET NULL
+    `);
+    console.log('   ✅ admin_role_id 已添加');
+  }
+
+  const [[{ cntRoles }]] = await pool.query('SELECT COUNT(*) AS cntRoles FROM admin_roles');
+  if (!cntRoles) {
+    console.log('🔄 迁移：写入预置角色与权限 …');
+    await pool.query(
+      `INSERT INTO admin_roles (code, name, description, is_system) VALUES
+       (?, '超级管理员', '全部管理端权限，含权限管理', 1),
+       (?, '系统管理员', '日常运维，不含权限管理与审计', 1),
+       (?, '厨师', '厨房与菜单订单等（可后续由超管调整）', 1)`,
+      [SUPER_ADMIN_CODE, SYSTEM_ADMIN_CODE, CHEF_DEFAULT_CODE]
+    );
+    const [sRows] = await pool.query('SELECT id FROM admin_roles WHERE code = ?', [SUPER_ADMIN_CODE]);
+    const [mRows] = await pool.query('SELECT id FROM admin_roles WHERE code = ?', [SYSTEM_ADMIN_CODE]);
+    const [cRows] = await pool.query('SELECT id FROM admin_roles WHERE code = ?', [CHEF_DEFAULT_CODE]);
+    const sid = sRows[0].id;
+    const mid = mRows[0].id;
+    const cid = cRows[0].id;
+
+    const insPerm = async (roleId, keys) => {
+      for (const k of keys) {
+        await pool.query(
+          'INSERT IGNORE INTO admin_role_permissions (role_id, permission_key) VALUES (?, ?)',
+          [roleId, k]
+        );
+      }
+    };
+    await insPerm(sid, ALL_KEYS);
+    await insPerm(mid, SYSTEM_ADMIN_KEYS);
+    await insPerm(cid, CHEF_DEFAULT_KEYS);
+
+    await pool.query(
+      `UPDATE users u
+       JOIN admin_roles ar ON ar.code = ?
+       SET u.admin_role_id = ar.id
+       WHERE u.role = 'admin'`,
+      [SUPER_ADMIN_CODE]
+    );
+    await pool.query(
+      `UPDATE users u
+       JOIN admin_roles ar ON ar.code = ?
+       SET u.admin_role_id = ar.id
+       WHERE u.role = 'chef'`,
+      [CHEF_DEFAULT_CODE]
+    );
+    console.log('   ✅ 预置岗位与用户绑定已写入');
+  }
+
+  // 无论是否首次写入岗位表：补齐「角色与后台岗位」列，否则岗位页 COUNT 与用户管理不一致
+  const [cdRow] = await pool.query('SELECT id FROM admin_roles WHERE code = ? LIMIT 1', [CHEF_DEFAULT_CODE]);
+  if (cdRow.length) {
+    const [up] = await pool.query(
+      'UPDATE users SET admin_role_id = ? WHERE role = ? AND (admin_role_id IS NULL OR admin_role_id = 0)',
+      [cdRow[0].id, 'chef']
+    );
+    if (up.affectedRows) console.log(`   ✅ 已补齐 ${up.affectedRows} 名厨师的 admin_role_id（厨师岗）`);
+  }
+  const [sdRow] = await pool.query('SELECT id FROM admin_roles WHERE code = ? LIMIT 1', [SUPER_ADMIN_CODE]);
+  if (sdRow.length) {
+    const [up] = await pool.query(
+      'UPDATE users SET admin_role_id = ? WHERE role = ? AND admin_role_id IS NULL',
+      [sdRow[0].id, 'admin']
+    );
+    if (up.affectedRows) console.log(`   ✅ 已补齐 ${up.affectedRows} 名管理员的 admin_role_id（超级管理员岗）`);
+  }
+
+  // 历史种子曾用「厨师默认」等展示名，统一为「厨师」（仅当仍为旧名时更新，避免覆盖运营自定义）
+  const [chefNameUp] = await pool.query(
+    `UPDATE admin_roles SET name = '厨师' WHERE code = ? AND name IN ('厨师默认', '厨师岗', '厨师（默认）')`,
+    [CHEF_DEFAULT_CODE]
+  );
+  if (chefNameUp.affectedRows) {
+    console.log(`   ✅ 已将 chef_default 岗位展示名更新为「厨师」（${chefNameUp.affectedRows} 行）`);
+  }
+}
+
 async function initDatabase() {
   console.log('📦 开始初始化数据库表...');
   for (const sql of CREATE_TABLES) {
@@ -428,6 +567,7 @@ async function initDatabase() {
   await migrateSchema();
   await migrateComments();
   await migrateOrderingWindow();
+  await migrateAdminRbac();
   console.log('✅ 数据库表初始化完成');
   await seedInitialData();
 }
@@ -514,10 +654,18 @@ async function seedInitialData() {
   if (existing.length === 0) {
     const hashed = await bcrypt.hash('admin123', 10);
     await pool.query(
-      "INSERT INTO users (username, password, nickname, role) VALUES ('admin', ?, '系统管理员', 'admin')",
+      `INSERT INTO users (username, password, nickname, role, admin_role_id)
+       SELECT 'admin', ?, '系统管理员', 'admin', id FROM admin_roles WHERE code = 'super_admin' LIMIT 1`,
       [hashed]
     );
     console.log('✅ 默认管理员账号已创建 - 用户名: admin  密码: admin123');
+  } else {
+    await pool.query(
+      `UPDATE users u
+       JOIN admin_roles ar ON ar.code = 'super_admin'
+       SET u.admin_role_id = ar.id
+       WHERE u.username = 'admin' AND u.role = 'admin' AND u.admin_role_id IS NULL`
+    );
   }
 }
 

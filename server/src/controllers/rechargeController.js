@@ -1,5 +1,6 @@
 const { pool } = require('../db/connection');
 const { success, fail } = require('../utils/response');
+const { writeAudit } = require('./rbacController');
 
 // 用户提交充值申请
 const createRecharge = async (req, res) => {
@@ -156,6 +157,11 @@ const reviewRecharge = async (req, res) => {
        WHERE id = ?`,
       [status, review_note || '', req.user.id, recordId]
     );
+
+    await writeAudit(req.user.id, 'recharge_reviewed', {
+      recharge_id: Number(recordId),
+      status,
+    });
 
     const msg = status === 'completed' ? '已标记为充值完成' : '已驳回该充值申请';
     return success(res, null, msg);

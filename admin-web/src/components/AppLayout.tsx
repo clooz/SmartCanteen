@@ -1,17 +1,20 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
-  Layout, Menu, Avatar, Dropdown, Button, theme, Tooltip, Breadcrumb, Drawer, Grid,
+  Layout, Menu, Avatar, Dropdown, Button, theme, Tooltip, Drawer, Grid,
 } from 'antd'
 import {
   ShopOutlined, CalendarOutlined, UnorderedListOutlined,
   BarChartOutlined, TeamOutlined, BankOutlined, WalletOutlined,
   StarOutlined, LogoutOutlined, UserOutlined, CoffeeOutlined,
   SunOutlined, MoonOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  DownOutlined, HomeOutlined, ControlOutlined, MenuOutlined,
+  DownOutlined, ControlOutlined, MenuOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
-import { authStore } from '../store/authStore'
+import { authStore, userHasPermission } from '../store/authStore'
 import type { ThemeMode, ThemeToggleOrigin } from '../App'
+import type { MenuProps } from 'antd'
+import type { ReactNode } from 'react'
 
 const { Sider, Header, Content } = Layout
 
@@ -20,25 +23,19 @@ interface Props {
   onToggleTheme: (origin?: ThemeToggleOrigin) => void
 }
 
-const adminMenuItems = [
-  { key: '/kitchen', icon: <CoffeeOutlined />, label: '实时订单' },
-  { key: '/dishes', icon: <ShopOutlined />, label: '菜品管理' },
-  { key: '/menus', icon: <CalendarOutlined />, label: '菜单管理' },
-  { key: '/orders', icon: <UnorderedListOutlined />, label: '订单管理' },
-  { key: '/report', icon: <BarChartOutlined />, label: '消费报表' },
-  { key: '/wish', icon: <StarOutlined />, label: '许愿活动' },
-  { key: '/recharge', icon: <WalletOutlined />, label: '充值审核' },
-  { key: '/users', icon: <TeamOutlined />, label: '用户管理' },
-  { key: '/companies', icon: <BankOutlined />, label: '公司管理' },
-]
+type MenuDef = { key: string; icon: ReactNode; label: string; permission?: string; superOnly?: boolean }
 
-const chefMenuItems = [
-  { key: '/kitchen', icon: <CoffeeOutlined />, label: '实时订单' },
-  { key: '/dishes', icon: <ShopOutlined />, label: '菜品管理' },
-  { key: '/menus', icon: <CalendarOutlined />, label: '菜单管理' },
-  { key: '/orders', icon: <UnorderedListOutlined />, label: '订单管理' },
-  { key: '/report', icon: <BarChartOutlined />, label: '消费报表' },
-  { key: '/wish', icon: <StarOutlined />, label: '许愿活动' },
+const MENU_DEFS: MenuDef[] = [
+  { key: '/kitchen', icon: <CoffeeOutlined />, label: '实时订单', permission: 'kitchen:view' },
+  { key: '/dishes', icon: <ShopOutlined />, label: '菜品管理', permission: 'dishes:read' },
+  { key: '/menus', icon: <CalendarOutlined />, label: '菜单管理', permission: 'menus:read' },
+  { key: '/orders', icon: <UnorderedListOutlined />, label: '订单管理', permission: 'orders:read' },
+  { key: '/report', icon: <BarChartOutlined />, label: '消费报表', permission: 'orders:report' },
+  { key: '/wish', icon: <StarOutlined />, label: '许愿活动', permission: 'wish:read' },
+  { key: '/recharge', icon: <WalletOutlined />, label: '充值审核', permission: 'recharge:read' },
+  { key: '/users', icon: <TeamOutlined />, label: '用户管理', permission: 'users:read' },
+  { key: '/companies', icon: <BankOutlined />, label: '公司管理', permission: 'companies:read' },
+  { key: '/rbac', icon: <SafetyCertificateOutlined />, label: '权限管理', superOnly: true },
 ]
 
 export default function AppLayout({ themeMode, onToggleTheme }: Props) {
@@ -49,8 +46,20 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
   const screens = Grid.useBreakpoint()
   const { token } = theme.useToken()
   const user = authStore.getUser()
-  const isAdmin = user?.role === 'admin'
-  const menuItems = isAdmin ? adminMenuItems : chefMenuItems
+
+  const menuItems: MenuProps['items'] = useMemo(() => {
+    if (!user) return []
+    return MENU_DEFS.filter((m) => {
+      if (m.superOnly) return user.is_super_admin
+      if (!m.permission) return true
+      return userHasPermission(user, m.permission)
+    }).map((m) => ({
+      key: m.key,
+      icon: m.icon,
+      label: m.label,
+    }))
+  }, [user])
+
   const isDark = themeMode === 'dark'
   const isCompactNav = screens.lg === false
 
@@ -154,7 +163,7 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
             textTransform: 'uppercase',
           }}
           >
-            {isAdmin ? '功能导航' : '操作台'}
+            功能导航
           </div>
         )}
         {menu}
@@ -189,6 +198,18 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
   )
 
   const contentPadding = isCompactNav ? 16 : 24
+
+  const roleSubtitle = () => {
+    if (!user) return ''
+    if (user.is_super_admin) return '超级管理员'
+    if (user.admin_role_code === 'system_admin') return '系统管理员'
+    if (user.role === 'chef') return '厨师'
+    if (user.role === 'admin') return '管理员'
+    return user.role
+  }
+
+  /** 顶栏第一行固定展示登录名（username），与「登录名在上、角色在下」一致 */
+  const loginLine = user?.username?.trim() || ''
 
   return (
     <Layout style={{ height: '100vh', overflow: 'hidden' }}>
@@ -236,7 +257,7 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
           boxShadow: 'none',
         }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
             {isCompactNav && (
               <Tooltip title="打开菜单">
                 <Button
@@ -248,31 +269,9 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
                 />
               </Tooltip>
             )}
-            <Breadcrumb
-              items={[
-                {
-                  title: (
-                    <Tooltip title="首页">
-                      <a
-                        href="/"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          navigate('/')
-                        }}
-                        aria-label="返回首页"
-                        style={{ color: token.colorTextSecondary, display: 'inline-flex', alignItems: 'center' }}
-                      >
-                        <HomeOutlined style={{ fontSize: 14 }} />
-                      </a>
-                    </Tooltip>
-                  ),
-                },
-              ]}
-              style={{ lineHeight: 1 }}
-            />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <Tooltip title={themeMode === 'light' ? '深色模式' : '浅色模式'}>
               <Button
                 type="text"
@@ -292,13 +291,18 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
               <Button
                 type="text"
                 aria-haspopup="menu"
+                aria-label="个人菜单"
                 style={{
                   height: 'auto',
-                  padding: '4px 8px',
-                  display: 'flex',
+                  padding: '4px 10px',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 8,
+                  gap: 10,
                   borderRadius: 8,
+                  flexShrink: 0,
+                  maxWidth: 'min(560px, calc(100vw - 100px))',
+                  overflow: 'visible',
+                  width: 'auto',
                 }}
               >
                 <Avatar
@@ -307,15 +311,43 @@ export default function AppLayout({ themeMode, onToggleTheme }: Props) {
                   src={user?.avatar || undefined}
                   style={{ background: token.colorPrimary, flexShrink: 0, fontSize: 12 }}
                 />
-                <div style={{ lineHeight: 1.4, textAlign: 'left' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: token.colorText, whiteSpace: 'nowrap' }}>
-                    {user?.nickname || user?.username}
+                <div
+                  style={{
+                    lineHeight: 1.35,
+                    textAlign: 'left',
+                    minWidth: 0,
+                    maxWidth: 'min(480px, calc(100vw - 180px))',
+                    width: 'max-content',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: token.colorText,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    {loginLine || '—'}
                   </div>
-                  <div style={{ fontSize: 11, color: token.colorTextTertiary, whiteSpace: 'nowrap' }}>
-                    {user?.role === 'admin' ? '管理员' : '厨师'}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: token.colorTextTertiary,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    {roleSubtitle()}
                   </div>
                 </div>
-                <DownOutlined style={{ fontSize: 10, color: token.colorTextQuaternary }} />
+                <DownOutlined style={{ fontSize: 10, color: token.colorTextQuaternary, flexShrink: 0 }} />
               </Button>
             </Dropdown>
           </div>
