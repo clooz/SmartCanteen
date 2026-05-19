@@ -12,7 +12,7 @@ const CURRENT = 'dev'
 const PRESETS = {
   dev: {
     // SYNC_MINIPROGRAM_API（由 scripts/sync-miniprogram-dev-ip.js 自动更新，勿改本行标记）
-    API_BASE: 'http://172.16.0.149:3000/api',
+    API_BASE: 'http://172.16.0.166:3000/api',
   },
   staging: {
     API_BASE: 'https://your-staging-host.example.com/api',

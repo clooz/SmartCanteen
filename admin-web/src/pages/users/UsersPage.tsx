@@ -118,7 +118,7 @@ export default function UsersPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form] = Form.useForm()
   const [pwdForm] = Form.useForm()
-  const watchCreatePassword = Form.useWatch('password', form)
+  const watchCreatePassword = Form.useWatch('create_password', form)
   const [syncModalOpen, setSyncModalOpen] = useState(false)
   const [syncJson, setSyncJson] = useState(SYNC_EXAMPLE)
   const [syncLoading, setSyncLoading] = useState(false)
@@ -288,11 +288,18 @@ export default function UsersPage() {
     setEditingId(null)
     form.resetFields()
     const u = authStore.getUser()
-    if (userHasPermission(u, 'rbac:assign')) {
-      form.setFieldsValue({ rolePick: 'employee' })
-    } else {
-      form.setFieldsValue({ role: 'employee' })
+    const defaults: Record<string, unknown> = {
+      create_username: '',
+      create_password: '',
+      phone: '',
+      nickname: '',
     }
+    if (userHasPermission(u, 'rbac:assign')) {
+      defaults.rolePick = 'employee'
+    } else {
+      defaults.role = 'employee'
+    }
+    form.setFieldsValue(defaults)
     setModalOpen(true)
   }
 
@@ -334,6 +341,10 @@ export default function UsersPage() {
     try {
       if (editingId === null) {
         const payload: Record<string, unknown> = { ...values }
+        payload.username = values.create_username
+        payload.password = values.create_password
+        delete payload.create_username
+        delete payload.create_password
         delete payload.rolePick
         delete payload.admin_role_id
         if (!payload.phone || !String(payload.phone).trim()) delete payload.phone
@@ -685,11 +696,11 @@ export default function UsersPage() {
 
       <Modal title={editingId ? '编辑用户' : '新增用户'} open={modalOpen} destroyOnClose
         onOk={handleSubmit} onCancel={() => setModalOpen(false)} okText="保存" confirmLoading={userModalSubmitting}>
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" autoComplete="off">
           {!editingId && (
             <>
               <Form.Item
-                name="username"
+                name="create_username"
                 label="邮箱（登录名）"
                 rules={[
                   { required: true, message: '请输入登录名' },
@@ -697,10 +708,15 @@ export default function UsersPage() {
                 ]}
                 extra="一般为邮箱，也可为管理员分配的其它登录名"
               >
-                <Input placeholder="邮箱或登录名" />
+                <Input
+                  placeholder="邮箱或登录名"
+                  autoComplete="off"
+                  name="sc-create-username"
+                  id="sc-create-username"
+                />
               </Form.Item>
               <Form.Item
-                name="password"
+                name="create_password"
                 label="初始密码"
                 rules={[
                   { required: true, message: '请输入初始密码' },
@@ -748,16 +764,19 @@ export default function UsersPage() {
               >
                 <Input.Password
                   placeholder="请输入或通过右侧生成"
+                  autoComplete="new-password"
+                  name="sc-create-password"
+                  id="sc-create-password"
                   addonAfter={(
                     <Button
                       type="link"
                       size="small"
                       style={{ padding: '0 4px', height: 22, lineHeight: '22px' }}
                       onClick={() => {
-                        const prev = form.getFieldValue('password') as string | undefined
+                        const prev = form.getFieldValue('create_password') as string | undefined
                         const next = generateStrongPassword({ length: 16, avoid: prev ?? '' })
-                        form.setFieldsValue({ password: next })
-                        void form.validateFields(['password'])
+                        form.setFieldsValue({ create_password: next })
+                        void form.validateFields(['create_password'])
                         message.success('已填入随机密码')
                       }}
                     >

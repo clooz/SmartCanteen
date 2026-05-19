@@ -21,7 +21,7 @@ import dayjs, { Dayjs } from 'dayjs'
 const { Text } = Typography
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  draft: { label: '草稿', color: 'default' },
+  draft: { label: '待发布', color: 'blue' },
   published: { label: '已发布', color: 'green' },
   closed: { label: '已关闭', color: 'red' },
 }
@@ -200,7 +200,7 @@ export default function MenusPage() {
         breakfast_ordering_override: bfOverride,
         lunch_ordering_override: luOverride,
       })
-      message.success('菜单保存成功')
+      message.success(editingMenuId === null ? '菜单已保存，状态为待发布' : '菜单保存成功')
       setModalOpen(false)
       fetchData(page, pageSize)
     } catch { /* 统一处理 */ }
@@ -266,13 +266,13 @@ export default function MenusPage() {
     }
   }
 
-  /** 批量发布（草稿或已关闭可再次发布） */
+  /** 批量发布（待发布或已关闭可再次发布） */
   const handleBatchPublish = () => {
     const targets = data.filter(
       r => selectedRowKeys.includes(r.id) && (r.status === 'draft' || r.status === 'closed')
     )
     if (!targets.length) {
-      message.warning('所选菜单中没有可发布的项（仅草稿或已关闭可发布）')
+      message.warning('所选菜单中没有可发布的项（仅待发布或已关闭可发布）')
       return
     }
     modal.confirm({
@@ -728,7 +728,7 @@ export default function MenusPage() {
           }}
         >
           <InfoCircleOutlined style={{ marginRight: 6 }} />
-          厨师可以提前把未来一周菜单保存为草稿；系统会在菜单当天自动发布，第二天自动关闭。需要临时停用时，点“关闭”即可。
+          可提前录入未来一周菜单并保存为待发布；系统会在菜单当天自动发布，次日自动关闭。需临时停用时，点击「关闭」即可；也可在列表中手动「发布」。
         </div>
         <TableLoadErrorAlert error={loadError} onRetry={() => fetchData(page, pageSize)} />
         <Table

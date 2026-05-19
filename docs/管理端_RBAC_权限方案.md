@@ -111,6 +111,7 @@ source: 由 Cursor 计划 rbac_设计评估_d700a3f3 同步至仓库，便于版
 - **默认策略**：拒绝优先（无配置则无权限）；登录后解析 `permission_keys[]`。
 - **超级管理员**：系统角色 `code=super_admin` 拥有全部权限（**含唯一** `rbac:*` / 权限管理模块）；可选迁移友好回退：`users.role === 'admin'` 且未绑定岗位时 = 全权限（**上线后可配置关闭**，且关闭后须保证至少一用户已绑 `super_admin`）。
 - **实现建议（防自锁）**：超管岗位自身的 permission 树在 UI 上**只读或锁定**，避免超管误取消自己的 `rbac:role:manage` / `rbac:assign`；与业主「多超管 + 库内账号」策略叠加更稳。
+- **操作级权限细分（v2 建议目录）**：各模块 `create` / `update` / `delete`、与旧 `*:write` 兼容策略、厨房与订单 key 对齐等，见 **[管理端_权限目录_细分方案.md](./管理端_权限目录_细分方案.md)**。
 
 ```mermaid
 flowchart LR

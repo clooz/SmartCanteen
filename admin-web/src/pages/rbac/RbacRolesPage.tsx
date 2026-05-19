@@ -22,10 +22,10 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { adminApi } from '../../api/admin'
+import PageListShell from '../../components/PageListShell'
 import { formatAuditAction, formatAuditDetail } from '../../utils/auditLogDisplay'
 import { tableListLocale } from '../../utils/tableListLocale'
 
@@ -286,12 +286,9 @@ export default function RbacRolesPage() {
   ]
 
   return (
-    <div>
-      <Typography.Title level={4} style={{ marginTop: 0 }}>
-        <SafetyCertificateOutlined style={{ marginRight: 8 }} />
-        权限管理
-      </Typography.Title>
-      <Tabs
+    <>
+      <PageListShell title="权限管理" variant="plain">
+        <Tabs
         items={[
           {
             key: 'roles',
@@ -371,7 +368,8 @@ export default function RbacRolesPage() {
             ),
           },
         ]}
-      />
+        />
+      </PageListShell>
 
       <Drawer
         title={
@@ -552,6 +550,6 @@ export default function RbacRolesPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </>
   )
 }

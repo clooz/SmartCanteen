@@ -75,7 +75,7 @@ const CREATE_TABLES = [
   `CREATE TABLE IF NOT EXISTS daily_menus (
     id INT AUTO_INCREMENT PRIMARY KEY,
     menu_date DATE NOT NULL UNIQUE COMMENT '菜单日期',
-    status ENUM('draft', 'published', 'closed') DEFAULT 'draft' COMMENT '草稿/已发布/已关闭',
+    status ENUM('draft', 'published', 'closed') DEFAULT 'draft' COMMENT '待发布(draft)/已发布/已关闭',
     breakfast_order_start TIME DEFAULT NULL COMMENT '按日覆盖早餐开始，NULL=用全局',
     breakfast_order_end TIME DEFAULT NULL COMMENT '按日覆盖早餐结束',
     lunch_order_start TIME DEFAULT NULL COMMENT '按日覆盖午餐开始',

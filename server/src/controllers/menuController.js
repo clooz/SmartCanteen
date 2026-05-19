@@ -9,7 +9,7 @@ const {
 } = require('../utils/orderingRules');
 
 // 获取某日菜单（含菜品列表）
-// 员工端仅展示「已发布」；管理员/厨师端可查看草稿/已关闭以便编辑（与 admin 菜单页 getByDate 一致）
+// 员工端仅展示「已发布」；管理端可查看待发布/已关闭以便编辑（与 admin 菜单页 getByDate 一致）
 const getMenuByDate = async (req, res) => {
   const date = req.params.date; // 格式 YYYY-MM-DD
   const employeeView = req.user?.role === 'employee';
