@@ -1,20 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Table, Button, Space, Tag, Image, Modal, Form, Input, InputNumber,
   Select, Upload, Switch, message, Typography, Popconfirm, App,
-  Tooltip, Pagination, Empty, Row, Col, Card,
+  Tooltip, Pagination, Empty, Row, Col, Card, Checkbox,
+  Popover, Badge, Divider,
 } from 'antd'
 import {
-  PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined,
+  PlusOutlined, EditOutlined, DeleteOutlined,
   CheckCircleOutlined, StopOutlined, AppstoreOutlined, UnorderedListOutlined,
-  PictureOutlined, ReloadOutlined,
+  PictureOutlined, ReloadOutlined, FilterOutlined,
 } from '@ant-design/icons'
+import ImgCrop from 'antd-img-crop'
 import { dishesApi } from '../../api/dishes'
 import PageListShell, { standardTablePagination } from '../../components/PageListShell'
 import { tableListLocale, TableLoadErrorAlert } from '../../utils/tableListLocale'
-import { filterBarRowStyle, filterBarCellStyle, filterBarLabelStyle } from '../../utils/filterToolbarLayout'
+import { filterBarRowStyle } from '../../utils/filterToolbarLayout'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 
 const CATEGORIES = ['主食', '荤菜', '素菜', '汤', '小吃', '饮料', '其他']
@@ -23,21 +26,38 @@ type ViewMode = 'list' | 'card'
 
 export default function DishesPage() {
   const { modal } = App.useApp()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // 从 URL 读取筛选/排序/分页参数
+  const filterCategory = searchParams.get('category') || undefined
+  const filterKeyword = searchParams.get('keyword') || undefined
+  const filterIsAvailable = searchParams.get('available') !== null ? Number(searchParams.get('available')) : undefined
+  const filterPriceMin = searchParams.get('priceMin') !== null ? Number(searchParams.get('priceMin')) : undefined
+  const filterPriceMax = searchParams.get('priceMax') !== null ? Number(searchParams.get('priceMax')) : undefined
+  const page = Number(searchParams.get('page')) || 1
+  const pageSize = Number(searchParams.get('pageSize')) || 10
+  const sortBy = searchParams.get('sortBy') || undefined
+  const sortOrder = searchParams.get('sortOrder') || undefined
+
+  // 更新 URL 参数的辅助函数
+  const updateParams = useCallback((updates: Record<string, string | undefined>) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      Object.entries(updates).forEach(([k, v]) => {
+        if (v === undefined || v === '') next.delete(k)
+        else next.set(k, v)
+      })
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form] = Form.useForm()
   const [fileList, setFileList] = useState<any[]>([])
-  const [filterCategory, setFilterCategory] = useState<string>()
-  const [filterKeyword, setFilterKeyword] = useState<string>()
-  const [filterIsAvailable, setFilterIsAvailable] = useState<number | undefined>()
-  const [filterPriceMin, setFilterPriceMin] = useState<number | undefined>()
-  const [filterPriceMax, setFilterPriceMax] = useState<number | undefined>()
-  const [dishToolbarKey, setDishToolbarKey] = useState(0)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
   const [loadError, setLoadError] = useState(false)
@@ -46,17 +66,32 @@ export default function DishesPage() {
     (localStorage.getItem('dishViewMode') as ViewMode) || 'list'
   )
 
-  const fetchData = async (p = page, ps = pageSize) => {
+  const [dishToolbarKey, setDishToolbarKey] = useState(0)
+
+  // 计算 Popover 内隐藏筛选条件的激活数，用于徽章提示
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filterIsAvailable !== undefined) count++
+    if (filterPriceMin != null && !Number.isNaN(filterPriceMin)) count++
+    if (filterPriceMax != null && !Number.isNaN(filterPriceMax)) count++
+    return count
+  }, [filterIsAvailable, filterPriceMin, filterPriceMax])
+
+  const fetchData = useCallback(async (p?: number, ps?: number) => {
+    const curPage = p ?? page
+    const curPageSize = ps ?? pageSize
     setLoading(true)
     setLoadError(false)
     try {
       const res: any = await dishesApi.getList({
-        page: p, page_size: ps,
+        page: curPage, page_size: curPageSize,
         category: filterCategory,
         keyword: filterKeyword,
         ...(filterIsAvailable === 0 || filterIsAvailable === 1 ? { is_available: filterIsAvailable } : {}),
         ...(filterPriceMin != null && !Number.isNaN(filterPriceMin) ? { price_min: filterPriceMin } : {}),
         ...(filterPriceMax != null && !Number.isNaN(filterPriceMax) ? { price_max: filterPriceMax } : {}),
+        ...(sortBy ? { sort_by: sortBy } : {}),
+        ...(sortOrder ? { sort_order: sortOrder } : {}),
       })
       setData(res.data.list)
       setTotal(res.data.total)
@@ -65,18 +100,17 @@ export default function DishesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterCategory, filterKeyword, filterIsAvailable, filterPriceMin, filterPriceMax, page, pageSize, sortBy, sortOrder])
 
-  useEffect(() => { fetchData(1); setPage(1) }, [filterCategory, filterKeyword, filterIsAvailable, filterPriceMin, filterPriceMax])
+  // 筛选/排序条件变化时自动回到第一页并重新加载
+  useEffect(() => {
+    fetchData(1)
+  }, [filterCategory, filterKeyword, filterIsAvailable, filterPriceMin, filterPriceMax, sortBy, sortOrder])
 
   const resetDishListFilters = () => {
-    setFilterCategory(undefined)
-    setFilterKeyword(undefined)
-    setFilterIsAvailable(undefined)
-    setFilterPriceMin(undefined)
-    setFilterPriceMax(undefined)
+    setSearchParams({}, { replace: true })
     setDishToolbarKey(k => k + 1)
-    setPage(1)
+    setSelectedRowKeys([])
   }
 
   const switchView = (mode: ViewMode) => {
@@ -179,6 +213,9 @@ export default function DishesPage() {
     } finally { setBatchLoading(false) }
   }
 
+  // 当前排序列的展示状态
+  const getSortOrder = (field: string) => sortBy === field ? (sortOrder === 'asc' ? 'ascend' as const : 'descend' as const) : undefined
+
   const columns = [
     {
       title: '图片', dataIndex: 'image_url',
@@ -195,16 +232,18 @@ export default function DishesPage() {
     },
     {
       title: '菜品名称', dataIndex: 'name',
-      width: 220,
+      width: 200,
+      sorter: true,
+      sortOrder: getSortOrder('name'),
       filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
         <div style={{ padding: 8 }}>
           <Input placeholder="搜索菜品名称" value={selectedKeys[0]}
             onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => { setFilterKeyword(selectedKeys[0]); confirm() }}
+            onPressEnter={() => { updateParams({ keyword: selectedKeys[0] || undefined, page: '1' }); confirm() }}
             style={{ marginBottom: 8, display: 'block' }} />
           <Space>
-            <Button type="primary" size="small" onClick={() => { setFilterKeyword(selectedKeys[0]); confirm() }}>搜索</Button>
-            <Button size="small" onClick={() => { clearFilters?.(); setFilterKeyword(undefined) }}>重置</Button>
+            <Button type="primary" size="small" onClick={() => { updateParams({ keyword: selectedKeys[0] || undefined, page: '1' }); confirm() }}>搜索</Button>
+            <Button size="small" onClick={() => { clearFilters?.(); updateParams({ keyword: undefined, page: '1' }) }}>重置</Button>
           </Space>
         </div>
       ),
@@ -221,20 +260,21 @@ export default function DishesPage() {
     },
     {
       title: '分类', dataIndex: 'category',
-      width: 110, align: 'center' as const,
+      width: 100, align: 'center' as const,
       filters: CATEGORIES.map(c => ({ text: c, value: c })),
       onFilter: (value: any, record: any) => record.category === value,
       render: (v: string) => <Tag style={{ margin: 0 }}>{v}</Tag>,
     },
     {
       title: '价格', dataIndex: 'price',
-      width: 110, align: 'right' as const,
-      sorter: (a: any, b: any) => Number(a.price) - Number(b.price),
+      width: 100, align: 'right' as const,
+      sorter: true,
+      sortOrder: getSortOrder('price'),
       render: (v: number) => <Text strong>¥{Number(v).toFixed(2)}</Text>,
     },
     {
       title: '状态', dataIndex: 'is_available',
-      width: 110, align: 'center' as const,
+      width: 90, align: 'center' as const,
       filters: [{ text: '上架', value: 1 }, { text: '下架', value: 0 }],
       onFilter: (value: any, record: any) => record.is_available === value,
       render: (v: number, record: any) => (
@@ -246,6 +286,20 @@ export default function DishesPage() {
           onChange={() => handleToggleAvailable(record)}
         />
       ),
+    },
+    {
+      title: '创建时间', dataIndex: 'created_at',
+      width: 140,
+      sorter: true,
+      sortOrder: getSortOrder('created_at'),
+      render: (v: string) => {
+        if (!v) return <Text type="secondary">-</Text>
+        const d = new Date(v)
+        const pad = (n: number) => String(n).padStart(2, '0')
+        return <Text type="secondary" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
+          {`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
+        </Text>
+      },
     },
     {
       title: '操作', width: 150, align: 'left' as const,
@@ -296,6 +350,25 @@ export default function DishesPage() {
                             fontSize: 44, color: '#adc6ff',
                           }}>🍽️</div>
                       }
+                      {/* 多选 checkbox 悬浮在左上角 */}
+                      <div style={{ position: 'absolute', top: 8, left: 8 }}>
+                        <Checkbox
+                          checked={selectedRowKeys.includes(item.id)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedRowKeys(prev => [...prev, item.id])
+                            } else {
+                              setSelectedRowKeys(prev => prev.filter(k => k !== item.id))
+                            }
+                          }}
+                          style={{
+                            background: 'rgba(255,255,255,0.85)',
+                            borderRadius: 4,
+                            padding: '2px 4px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                          }}
+                        />
+                      </div>
                       {/* 上架/下架 悬浮在图片右上角 */}
                       <div style={{ position: 'absolute', top: 8, right: 8 }}>
                         <Switch
@@ -366,7 +439,7 @@ export default function DishesPage() {
               current: page,
               total,
               pageSize,
-              onChange: (p, ps) => { setPage(p); setPageSize(ps); fetchData(p, ps) },
+              onChange: (p, ps) => { updateParams({ page: String(p), pageSize: String(ps) }); fetchData(p, ps) },
             })}
           />
         </div>
@@ -393,60 +466,95 @@ export default function DishesPage() {
         }
         filterBar={
           <div style={filterBarRowStyle}>
-            <div style={filterBarCellStyle(140)}>
-              <Text type="secondary" style={filterBarLabelStyle}>分类</Text>
-              <Select
-                placeholder="全部"
-                allowClear
-                style={{ flex: 1, minWidth: 88, maxWidth: '100%' }}
-                onChange={v => setFilterCategory(v)}
-                value={filterCategory}
-              >
-                {CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
-              </Select>
-            </div>
-            <div style={filterBarCellStyle(180)}>
-              <Text type="secondary" style={filterBarLabelStyle}>名称</Text>
-              <Input.Search
-                key={`d-lk-${dishToolbarKey}`}
-                placeholder="搜索菜品名"
-                onSearch={v => setFilterKeyword(v || undefined)}
-                allowClear
-                style={{ flex: 1, minWidth: 0, maxWidth: '100%' }}
-              />
-            </div>
-            <div style={filterBarCellStyle(120)}>
-              <Text type="secondary" style={filterBarLabelStyle}>上架</Text>
-              <Select
-                placeholder="全部"
-                allowClear
-                style={{ flex: 1, minWidth: 72, maxWidth: '100%' }}
-                value={filterIsAvailable}
-                onChange={v => setFilterIsAvailable(v)}
-                options={[{ label: '上架', value: 1 }, { label: '下架', value: 0 }]}
-              />
-            </div>
-            <div style={filterBarCellStyle(200, 'center')}>
-              <Text type="secondary" style={filterBarLabelStyle}>价格</Text>
-              <InputNumber
-                min={0}
-                placeholder="最低"
-                style={{ width: 88, maxWidth: '100%' }}
-                value={filterPriceMin}
-                onChange={v => setFilterPriceMin(v === null ? undefined : Number(v))}
-              />
-              <Text type="secondary" style={{ fontSize: 13 }}>~</Text>
-              <InputNumber
-                min={0}
-                placeholder="最高"
-                style={{ width: 88, maxWidth: '100%' }}
-                value={filterPriceMax}
-                onChange={v => setFilterPriceMax(v === null ? undefined : Number(v))}
-              />
-            </div>
-            <div style={filterBarCellStyle(200, 'flex-end')}>
-              <Button onClick={resetDishListFilters}>重置筛选</Button>
-              <Button icon={<ReloadOutlined />} onClick={() => fetchData(page, pageSize)}>刷新</Button>
+            {/* 分类 */}
+            <Select
+              placeholder="全部分类"
+              allowClear
+              style={{ flex: 1, minWidth: 120 }}
+              value={filterCategory}
+              onChange={v => updateParams({ category: v, page: '1' })}
+            >
+              {CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
+            </Select>
+
+            {/* 搜索框 */}
+            <Input.Search
+              key={`d-lk-${dishToolbarKey}`}
+              placeholder="搜索菜品名称"
+              onSearch={v => updateParams({ keyword: v || undefined, page: '1' })}
+              allowClear
+              style={{ flex: 1.5, minWidth: 160 }}
+            />
+
+            {/* 排序 */}
+            <Select
+              placeholder="默认排序"
+              allowClear
+              style={{ flex: 1, minWidth: 130 }}
+              value={sortBy ? `${sortBy}_${sortOrder}` : undefined}
+              onChange={v => {
+                if (!v) { updateParams({ sortBy: undefined, sortOrder: undefined }); return }
+                const [by, order] = v.split('_')
+                updateParams({ sortBy: by, sortOrder: order })
+              }}
+              options={[
+                { label: '名称 A → Z', value: 'name_asc' },
+                { label: '名称 Z → A', value: 'name_desc' },
+                { label: '价格 低 → 高', value: 'price_asc' },
+                { label: '价格 高 → 低', value: 'price_desc' },
+                { label: '最近添加', value: 'created_at_desc' },
+                { label: '最早添加', value: 'created_at_asc' },
+              ]}
+            />
+
+            {/* 更多筛选 Popover */}
+            <Popover
+              trigger="click"
+              placement="bottomRight"
+              content={
+                <div style={{ width: 260 }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>上架状态</Text>
+                    <Select
+                      placeholder="全部状态"
+                      allowClear
+                      style={{ width: '100%' }}
+                      value={filterIsAvailable}
+                      onChange={v => updateParams({ available: v?.toString(), page: '1' })}
+                      options={[{ label: '已上架', value: 1 }, { label: '已下架', value: 0 }]}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>价格区间</Text>
+                    <Space>
+                      <InputNumber
+                        min={0} size="small" placeholder="最低价"
+                        style={{ width: 105 }} value={filterPriceMin}
+                        onChange={v => updateParams({ priceMin: v === null ? undefined : v?.toString(), page: '1' })}
+                      />
+                      <Text type="secondary">-</Text>
+                      <InputNumber
+                        min={0} size="small" placeholder="最高价"
+                        style={{ width: 105 }} value={filterPriceMax}
+                        onChange={v => updateParams({ priceMax: v === null ? undefined : v?.toString(), page: '1' })}
+                      />
+                    </Space>
+                  </div>
+                  <Divider style={{ margin: '8px 0' }} />
+                  <Button block size="small" onClick={resetDishListFilters}>重置所有筛选</Button>
+                </div>
+              }
+            >
+              <Badge count={activeFilterCount} size="small" offset={[-3, 3]}>
+                <Button icon={<FilterOutlined />}>筛选</Button>
+              </Badge>
+            </Popover>
+
+            {/* 右侧操作区 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <Tooltip title="刷新数据">
+                <Button icon={<ReloadOutlined />} onClick={() => fetchData()} />
+              </Tooltip>
               <Space.Compact>
                 <Tooltip title="列表视图">
                   <Button
@@ -476,16 +584,23 @@ export default function DishesPage() {
             columns={columns}
             loading={loading}
             locale={tableListLocale}
-            scroll={{ x: 800 }}
+            scroll={{ x: 900 }}
             rowSelection={{
               selectedRowKeys,
               onChange: keys => setSelectedRowKeys(keys as number[]),
+            }}
+            onChange={(_pagination, _filters, sorter: any) => {
+              if (sorter.order) {
+                updateParams({ sortBy: sorter.field, sortOrder: sorter.order === 'ascend' ? 'asc' : 'desc' })
+              } else {
+                updateParams({ sortBy: undefined, sortOrder: undefined })
+              }
             }}
             pagination={standardTablePagination({
               current: page,
               total,
               pageSize,
-              onChange: (p, ps) => { setPage(p); setPageSize(ps); fetchData(p, ps) },
+              onChange: (p, ps) => { updateParams({ page: String(p), pageSize: String(ps) }); fetchData(p, ps) },
             })}
           />
         ) : (
@@ -607,20 +722,22 @@ export default function DishesPage() {
           {/* 菜品图片 — 独占一行 */}
           <Form.Item label="菜品图片" style={{ marginBottom: 0 }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              <Upload
-                listType="picture-card"
-                fileList={fileList}
-                maxCount={1}
-                beforeUpload={() => false}
-                onChange={({ fileList }) => setFileList(fileList)}
-              >
-                {fileList.length === 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, color: '#94A3B8' }}>
-                    <PictureOutlined style={{ fontSize: 20 }} />
-                    <span style={{ fontSize: 12 }}>点击上传</span>
-                  </div>
-                )}
-              </Upload>
+              <ImgCrop rotationSlider aspect={1} quality={0.9}>
+                <Upload
+                  listType="picture-card"
+                  fileList={fileList}
+                  maxCount={1}
+                  beforeUpload={() => false}
+                  onChange={({ fileList }) => setFileList(fileList)}
+                >
+                  {fileList.length === 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, color: '#94A3B8' }}>
+                      <PictureOutlined style={{ fontSize: 20 }} />
+                      <span style={{ fontSize: 12 }}>点击上传</span>
+                    </div>
+                  )}
+                </Upload>
+              </ImgCrop>
               <span style={{ fontSize: 12, color: '#94A3B8', lineHeight: 1.6, marginTop: 4 }}>
                 支持 JPG / PNG<br />建议尺寸 400×400
               </span>

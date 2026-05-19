@@ -11,7 +11,7 @@ const deleteUploadedFile = (imageUrl) => {
 
 // 获取菜品列表（支持分类筛选、关键字搜索、分页）
 const getDishes = async (req, res) => {
-  const { category, keyword, is_available, page = 1, page_size = 20, price_min, price_max } = req.query;
+  const { category, keyword, is_available, page = 1, page_size = 20, price_min, price_max, sort_by, sort_order } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(page_size);
 
   let where = ['1=1'];
@@ -40,13 +40,19 @@ const getDishes = async (req, res) => {
 
   const whereSql = where.join(' AND ');
 
+  // 排序白名单，防 SQL 注入
+  const ALLOWED_SORT = ['name', 'price', 'created_at', 'category'];
+  const sortCol = ALLOWED_SORT.includes(sort_by) ? sort_by : 'category';
+  const sortDir = sort_order === 'asc' ? 'ASC' : 'DESC';
+  const orderBy = `${sortCol} ${sortDir}` + (sortCol !== 'category' ? `, category ASC` : '') + `, id DESC`;
+
   try {
     const [[{ total }]] = await pool.query(
       `SELECT COUNT(*) AS total FROM dishes WHERE ${whereSql}`,
       params
     );
     const [rows] = await pool.query(
-      `SELECT * FROM dishes WHERE ${whereSql} ORDER BY category, id DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM dishes WHERE ${whereSql} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
       [...params, parseInt(page_size), offset]
     );
     return success(res, { total, page: parseInt(page), page_size: parseInt(page_size), list: rows });
